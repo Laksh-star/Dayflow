@@ -163,6 +163,82 @@ struct LLMProviderSetupView: View {
     }
   }
 
+  var apiProviderSetupOptions: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: 6) {
+        Text("Provider profile")
+          .font(.custom("Figtree", size: 12))
+          .fontWeight(.semibold)
+          .foregroundColor(SettingsStyle.secondary)
+
+        Picker("Provider profile", selection: $setupState.openAICompatibleProfile) {
+          ForEach(OpenAICompatibleProviderProfile.allCases) { profile in
+            Text(profile.displayName).tag(profile)
+          }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .frame(maxWidth: 260, alignment: .leading)
+        .onChange(of: setupState.openAICompatibleProfile) { _, newValue in
+          setupState.applyOpenAICompatibleProfile(newValue)
+        }
+      }
+
+      HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 6) {
+          Text("Auth header")
+            .font(.custom("Figtree", size: 12))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.secondary)
+
+          Picker("Auth header", selection: $setupState.openAICompatibleAuthMode) {
+            ForEach(OpenAICompatibleAuthMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          .pickerStyle(.menu)
+          .labelsHidden()
+          .frame(width: 180, alignment: .leading)
+        }
+
+        if setupState.openAICompatibleAuthMode == .customHeader {
+          VStack(alignment: .leading, spacing: 6) {
+            Text("Header name")
+              .font(.custom("Figtree", size: 12))
+              .fontWeight(.semibold)
+              .foregroundColor(SettingsStyle.secondary)
+
+            TextField(
+              OpenAICompatibleProviderSettings.defaultCustomHeaderName,
+              text: $setupState.openAICompatibleCustomHeaderName
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 210)
+          }
+        }
+      }
+
+      VStack(alignment: .leading, spacing: 6) {
+        Text("Token parameter")
+          .font(.custom("Figtree", size: 12))
+          .fontWeight(.semibold)
+          .foregroundColor(SettingsStyle.secondary)
+
+        Picker(
+          "Token parameter",
+          selection: $setupState.openAICompatibleUseMaxCompletionTokensOverride
+        ) {
+          Text("Auto").tag(Optional<Bool>.none)
+          Text("max_tokens").tag(Optional(false))
+          Text("max_completion_tokens").tag(Optional(true))
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: 500)
+      }
+    }
+  }
+
   @ViewBuilder
   var currentStepContent: some View {
     let step = setupState.currentStep
@@ -464,6 +540,8 @@ struct LLMProviderSetupView: View {
                   }
                 )
               } else if providerType == OpenAICompatibleProviderSettings.providerID {
+                apiProviderSetupOptions
+
                 LocalLLMTestView(
                   baseURL: $setupState.openAICompatibleBaseURL,
                   modelId: $setupState.openAICompatibleModelId,
@@ -474,9 +552,12 @@ struct LLMProviderSetupView: View {
                   basePlaceholder: OpenAICompatibleProviderSettings.defaultBaseURL,
                   modelPlaceholder: OpenAICompatibleProviderSettings.defaultModelID,
                   apiKeyLabel: "API key",
-                  apiKeyHelpText: "Stored safely in Keychain and sent as a Bearer token.",
+                  apiKeyHelpText: setupState.openAICompatibleAuthHelpText,
                   failureHelpText:
                     "Check that the endpoint supports OpenAI Chat Completions with vision input and that the model ID is available for this key.",
+                  usesBuiltInCustomAuth: false,
+                  additionalHeaders: { setupState.openAICompatibleAuthHeadersForTest },
+                  usesMaxCompletionTokens: setupState.openAICompatibleUsesMaxCompletionTokens,
                   onTestComplete: { success in
                     setupState.hasTestedConnection = true
                     setupState.testSuccessful = success
@@ -710,8 +791,14 @@ struct LLMProviderSetupView: View {
   }
 
   func persistOpenAICompatibleSettings() {
+    OpenAICompatibleProviderSettings.saveProfile(setupState.openAICompatibleProfile)
     OpenAICompatibleProviderSettings.saveBaseURL(setupState.openAICompatibleBaseURL)
     OpenAICompatibleProviderSettings.saveModelID(setupState.openAICompatibleModelId)
+    OpenAICompatibleProviderSettings.saveAuthMode(setupState.openAICompatibleAuthMode)
+    OpenAICompatibleProviderSettings.saveCustomHeaderName(setupState.openAICompatibleCustomHeaderName)
+    OpenAICompatibleProviderSettings.saveUsesMaxCompletionTokensOverride(
+      setupState.openAICompatibleUseMaxCompletionTokensOverride
+    )
     _ = OpenAICompatibleProviderSettings.saveAPIKey(setupState.openAICompatibleAPIKey)
     let type = LLMProviderType.openAICompatible(
       endpoint: OpenAICompatibleProviderSettings.loadBaseURL()

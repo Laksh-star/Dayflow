@@ -64,6 +64,9 @@ struct LocalLLMTestView: View {
   let apiKeyLabel: String
   let apiKeyHelpText: String
   let failureHelpText: String
+  let usesBuiltInCustomAuth: Bool
+  let additionalHeaders: () -> [String: String]
+  let usesMaxCompletionTokens: (_ modelId: String, _ baseURL: String) -> Bool
   let onTestComplete: (Bool) -> Void
 
   init(
@@ -80,6 +83,15 @@ struct LocalLLMTestView: View {
       "Stored locally in UserDefaults and sent as a Bearer token for custom endpoints (LiteLLM, OpenRouter, etc.)",
     failureHelpText: String =
       "If you get stuck here, you can go back and choose the ‘Bring your own key’ option — it only takes a minute to set up.",
+    usesBuiltInCustomAuth: Bool = true,
+    additionalHeaders: @escaping () -> [String: String] = { [:] },
+    usesMaxCompletionTokens: @escaping (_ modelId: String, _ baseURL: String) -> Bool = {
+      modelId, baseURL in
+      OpenAICompatibleProviderSettings.usesMaxCompletionTokens(
+        modelId: modelId,
+        baseURL: baseURL
+      )
+    },
     onTestComplete: @escaping (Bool) -> Void
   ) {
     _baseURL = baseURL
@@ -93,6 +105,9 @@ struct LocalLLMTestView: View {
     self.apiKeyLabel = apiKeyLabel
     self.apiKeyHelpText = apiKeyHelpText
     self.failureHelpText = failureHelpText
+    self.usesBuiltInCustomAuth = usesBuiltInCustomAuth
+    self.additionalHeaders = additionalHeaders
+    self.usesMaxCompletionTokens = usesMaxCompletionTokens
     self.onTestComplete = onTestComplete
   }
 
@@ -190,10 +205,7 @@ struct LocalLLMTestView: View {
         )
       ],
       maxTokens: 10,
-      usesMaxCompletionTokens: OpenAICompatibleProviderSettings.usesMaxCompletionTokens(
-        modelId: modelId,
-        baseURL: baseURL
-      )
+      usesMaxCompletionTokens: usesMaxCompletionTokens(modelId, baseURL)
     )
 
     var request = URLRequest(url: url)
@@ -202,8 +214,11 @@ struct LocalLLMTestView: View {
     if engine == .lmstudio {
       request.setValue("Bearer lm-studio", forHTTPHeaderField: "Authorization")
     }
-    if engine == .custom && !trimmedAPIKey.isEmpty {
+    if usesBuiltInCustomAuth && engine == .custom && !trimmedAPIKey.isEmpty {
       request.setValue("Bearer \(trimmedAPIKey)", forHTTPHeaderField: "Authorization")
+    }
+    for (field, value) in additionalHeaders() {
+      request.setValue(value, forHTTPHeaderField: field)
     }
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase

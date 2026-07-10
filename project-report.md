@@ -36,6 +36,9 @@ This file tracks the local development work added on top of the upstream
 - Supports API key storage in Keychain, base URL, model ID, and provider health test.
 - Handles newer OpenAI reasoning/chat models that require `max_completion_tokens` instead of `max_tokens`.
 - Reused the richer timeline-card prompt flow so API-generated cards can split a batch into multiple activities.
+- Added API profiles for OpenAI, OpenRouter, LiteLLM, local proxies, and custom endpoints.
+- Added configurable auth headers: Bearer token, x-api-key, custom header, or no auth header.
+- Added token-parameter override so providers can force `max_tokens` or `max_completion_tokens` when auto-detection is wrong.
 
 ### Privacy rules engine
 
@@ -77,6 +80,7 @@ Good candidates for focused upstream pull requests:
 ## Known Gaps
 
 - API provider compatibility is currently OpenAI-compatible chat/completions oriented, not a fully generic provider abstraction.
+- API provider profiles do not yet support arbitrary extra headers such as OpenRouter attribution headers.
 - Gemini repair model override only applies when the entered model maps to a known `GeminiModel` case.
 - Repair retries do not yet let the user select an arbitrary custom endpoint per run.
 - Privacy preview is app/window oriented; it does not yet show screenshot redaction thumbnails.

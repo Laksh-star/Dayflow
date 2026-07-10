@@ -55,10 +55,37 @@ final class ProvidersSettingsViewModel: ObservableObject {
       OpenAICompatibleProviderSettings.saveBaseURL(openAICompatibleBaseURL)
     }
   }
+  @Published var openAICompatibleProfile: OpenAICompatibleProviderProfile {
+    didSet {
+      guard oldValue != openAICompatibleProfile else { return }
+      OpenAICompatibleProviderSettings.applyProfileDefaults(openAICompatibleProfile)
+      reloadOpenAICompatibleProviderSettings()
+    }
+  }
   @Published var openAICompatibleModelId: String {
     didSet {
       guard oldValue != openAICompatibleModelId else { return }
       OpenAICompatibleProviderSettings.saveModelID(openAICompatibleModelId)
+    }
+  }
+  @Published var openAICompatibleAuthMode: OpenAICompatibleAuthMode {
+    didSet {
+      guard oldValue != openAICompatibleAuthMode else { return }
+      OpenAICompatibleProviderSettings.saveAuthMode(openAICompatibleAuthMode)
+    }
+  }
+  @Published var openAICompatibleCustomHeaderName: String {
+    didSet {
+      guard oldValue != openAICompatibleCustomHeaderName else { return }
+      OpenAICompatibleProviderSettings.saveCustomHeaderName(openAICompatibleCustomHeaderName)
+    }
+  }
+  @Published var openAICompatibleUseMaxCompletionTokensOverride: Bool? {
+    didSet {
+      guard oldValue != openAICompatibleUseMaxCompletionTokensOverride else { return }
+      OpenAICompatibleProviderSettings.saveUsesMaxCompletionTokensOverride(
+        openAICompatibleUseMaxCompletionTokensOverride
+      )
     }
   }
   @Published var openAICompatibleAPIKey: String {
@@ -154,8 +181,13 @@ final class ProvidersSettingsViewModel: ObservableObject {
     }
 
     localAPIKey = UserDefaults.standard.string(forKey: "llmLocalAPIKey") ?? ""
+    openAICompatibleProfile = OpenAICompatibleProviderSettings.loadProfile()
     openAICompatibleBaseURL = OpenAICompatibleProviderSettings.loadBaseURL()
     openAICompatibleModelId = OpenAICompatibleProviderSettings.loadModelID()
+    openAICompatibleAuthMode = OpenAICompatibleProviderSettings.loadAuthMode()
+    openAICompatibleCustomHeaderName = OpenAICompatibleProviderSettings.loadCustomHeaderName()
+    openAICompatibleUseMaxCompletionTokensOverride =
+      OpenAICompatibleProviderSettings.loadUsesMaxCompletionTokensOverride()
     openAICompatibleAPIKey = OpenAICompatibleProviderSettings.loadAPIKey()
     if let raw = UserDefaults.standard.string(forKey: "chatCLIPreferredTool") {
       preferredCLITool = CLITool(rawValue: raw)
@@ -186,8 +218,14 @@ final class ProvidersSettingsViewModel: ObservableObject {
   }
 
   func handleOpenAICompatibleTestCompletion() {
+    OpenAICompatibleProviderSettings.saveProfile(openAICompatibleProfile)
     OpenAICompatibleProviderSettings.saveBaseURL(openAICompatibleBaseURL)
     OpenAICompatibleProviderSettings.saveModelID(openAICompatibleModelId)
+    OpenAICompatibleProviderSettings.saveAuthMode(openAICompatibleAuthMode)
+    OpenAICompatibleProviderSettings.saveCustomHeaderName(openAICompatibleCustomHeaderName)
+    OpenAICompatibleProviderSettings.saveUsesMaxCompletionTokensOverride(
+      openAICompatibleUseMaxCompletionTokensOverride
+    )
     persistOpenAICompatibleAPIKey(openAICompatibleAPIKey)
   }
 
@@ -225,9 +263,35 @@ final class ProvidersSettingsViewModel: ObservableObject {
   }
 
   func reloadOpenAICompatibleProviderSettings() {
+    openAICompatibleProfile = OpenAICompatibleProviderSettings.loadProfile()
     openAICompatibleBaseURL = OpenAICompatibleProviderSettings.loadBaseURL()
     openAICompatibleModelId = OpenAICompatibleProviderSettings.loadModelID()
+    openAICompatibleAuthMode = OpenAICompatibleProviderSettings.loadAuthMode()
+    openAICompatibleCustomHeaderName = OpenAICompatibleProviderSettings.loadCustomHeaderName()
+    openAICompatibleUseMaxCompletionTokensOverride =
+      OpenAICompatibleProviderSettings.loadUsesMaxCompletionTokensOverride()
     openAICompatibleAPIKey = OpenAICompatibleProviderSettings.loadAPIKey()
+  }
+
+  var openAICompatibleAuthHeadersForTest: [String: String] {
+    OpenAICompatibleProviderSettings.authorizationHeaders(apiKey: openAICompatibleAPIKey)
+  }
+
+  func openAICompatibleUsesMaxCompletionTokens(modelId: String, baseURL: String) -> Bool {
+    OpenAICompatibleProviderSettings.usesMaxCompletionTokens(modelId: modelId, baseURL: baseURL)
+  }
+
+  var openAICompatibleAuthHelpText: String {
+    switch openAICompatibleAuthMode {
+    case .bearer:
+      return "Stored safely in Keychain and sent as an Authorization Bearer token."
+    case .apiKeyHeader:
+      return "Stored safely in Keychain and sent as x-api-key."
+    case .customHeader:
+      return "Stored safely in Keychain and sent as the custom header value."
+    case .none:
+      return "No auth header will be sent. Leave the key blank for local proxies."
+    }
   }
 
   var usingRecommendedLocalModel: Bool {
@@ -563,7 +627,10 @@ final class ProvidersSettingsViewModel: ObservableObject {
         .trimmingCharacters(in: .whitespacesAndNewlines)
       let modelId = OpenAICompatibleProviderSettings.loadModelID()
         .trimmingCharacters(in: .whitespacesAndNewlines)
-      return !baseURL.isEmpty && !modelId.isEmpty && OpenAICompatibleProviderSettings.hasAPIKey()
+      let authReady =
+        OpenAICompatibleProviderSettings.loadAuthMode() == .none
+        || OpenAICompatibleProviderSettings.hasAPIKey()
+      return !baseURL.isEmpty && !modelId.isEmpty && authReady
     case "chatgpt_claude":
       if UserDefaults.standard.bool(forKey: "chatgpt_claudeSetupComplete") {
         return true

@@ -64,7 +64,7 @@ extension OllamaProvider {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        applyAuthorizationHeader(to: &urlRequest)
+        applyAdditionalHeaders(to: &urlRequest)
         urlRequest.httpBody = try encodedChatRequest(request)
         urlRequest.timeoutInterval = 60.0  // 60-second timeout
 
@@ -257,9 +257,9 @@ extension OllamaProvider {
     return response.choices.first?.message.content ?? ""
   }
 
-  private func applyAuthorizationHeader(to request: inout URLRequest) {
-    if let authorizationHeaderValue {
-      request.setValue(authorizationHeaderValue, forHTTPHeaderField: "Authorization")
+  private func applyAdditionalHeaders(to request: inout URLRequest) {
+    for (field, value) in additionalHeaders {
+      request.setValue(value, forHTTPHeaderField: field)
     }
   }
 

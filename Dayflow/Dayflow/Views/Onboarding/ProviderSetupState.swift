@@ -15,8 +15,16 @@ class ProviderSetupState: ObservableObject {
   @Published var localBaseURL: String = LocalEngine.lmstudio.defaultBaseURL
   @Published var localModelId: String = LocalModelPreferences.defaultModelId(for: .lmstudio)
   @Published var localAPIKey: String = UserDefaults.standard.string(forKey: "llmLocalAPIKey") ?? ""
+  @Published var openAICompatibleProfile: OpenAICompatibleProviderProfile =
+    OpenAICompatibleProviderSettings.loadProfile()
   @Published var openAICompatibleBaseURL: String = OpenAICompatibleProviderSettings.loadBaseURL()
   @Published var openAICompatibleModelId: String = OpenAICompatibleProviderSettings.loadModelID()
+  @Published var openAICompatibleAuthMode: OpenAICompatibleAuthMode =
+    OpenAICompatibleProviderSettings.loadAuthMode()
+  @Published var openAICompatibleCustomHeaderName: String =
+    OpenAICompatibleProviderSettings.loadCustomHeaderName()
+  @Published var openAICompatibleUseMaxCompletionTokensOverride: Bool? =
+    OpenAICompatibleProviderSettings.loadUsesMaxCompletionTokensOverride()
   @Published var openAICompatibleAPIKey: String = OpenAICompatibleProviderSettings.loadAPIKey()
   // CLI detection
   @Published var codexCLIStatus: CLIDetectionState = .unknown
@@ -131,8 +139,13 @@ class ProviderSetupState: ObservableObject {
       isCheckingCLIStatus = false
       hasStartedCLICheck = false
     case OpenAICompatibleProviderSettings.providerID:
+      openAICompatibleProfile = OpenAICompatibleProviderSettings.loadProfile()
       openAICompatibleBaseURL = OpenAICompatibleProviderSettings.loadBaseURL()
       openAICompatibleModelId = OpenAICompatibleProviderSettings.loadModelID()
+      openAICompatibleAuthMode = OpenAICompatibleProviderSettings.loadAuthMode()
+      openAICompatibleCustomHeaderName = OpenAICompatibleProviderSettings.loadCustomHeaderName()
+      openAICompatibleUseMaxCompletionTokensOverride =
+        OpenAICompatibleProviderSettings.loadUsesMaxCompletionTokensOverride()
       openAICompatibleAPIKey = OpenAICompatibleProviderSettings.loadAPIKey()
       steps = [
         SetupStep(
@@ -239,6 +252,55 @@ class ProviderSetupState: ObservableObject {
 
   func clearGeminiAPIKeySaveError() {
     geminiAPIKeySaveError = nil
+  }
+
+  func applyOpenAICompatibleProfile(_ profile: OpenAICompatibleProviderProfile) {
+    openAICompatibleProfile = profile
+    openAICompatibleBaseURL = profile.defaultBaseURL
+    openAICompatibleModelId = profile.defaultModelID
+    openAICompatibleAuthMode = profile.defaultAuthMode
+    hasTestedConnection = false
+    testSuccessful = false
+  }
+
+  var openAICompatibleAuthHeadersForTest: [String: String] {
+    let trimmedKey = openAICompatibleAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedKey.isEmpty else { return [:] }
+
+    switch openAICompatibleAuthMode {
+    case .bearer:
+      return ["Authorization": "Bearer \(trimmedKey)"]
+    case .apiKeyHeader:
+      return ["x-api-key": trimmedKey]
+    case .customHeader:
+      let header = openAICompatibleCustomHeaderName.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !header.isEmpty else { return [:] }
+      return [header: trimmedKey]
+    case .none:
+      return [:]
+    }
+  }
+
+  func openAICompatibleUsesMaxCompletionTokens(modelId: String, baseURL: String) -> Bool {
+    if let override = openAICompatibleUseMaxCompletionTokensOverride {
+      return override
+    }
+    let normalizedModel = modelId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    return normalizedModel.hasPrefix("gpt-5") || normalizedModel.hasPrefix("o1")
+      || normalizedModel.hasPrefix("o3") || normalizedModel.hasPrefix("o4")
+  }
+
+  var openAICompatibleAuthHelpText: String {
+    switch openAICompatibleAuthMode {
+    case .bearer:
+      return "Stored safely in Keychain and sent as an Authorization Bearer token."
+    case .apiKeyHeader:
+      return "Stored safely in Keychain and sent as x-api-key."
+    case .customHeader:
+      return "Stored safely in Keychain and sent as the custom header value."
+    case .none:
+      return "No auth header will be sent. Leave the key blank for local proxies."
+    }
   }
 
   @discardableResult

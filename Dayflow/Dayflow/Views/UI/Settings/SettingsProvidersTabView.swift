@@ -102,6 +102,9 @@ struct SettingsProvidersTabView: View {
         SettingsMetadata(text: hasKey ? "Stored in UserDefaults" : "Not set")
       }
     case OpenAICompatibleProviderSettings.providerID:
+      SettingsRow(label: "Profile") {
+        SettingsMetadata(text: viewModel.openAICompatibleProfile.displayName)
+      }
       SettingsRow(label: "Model") {
         SettingsMetadata(
           text: viewModel.openAICompatibleModelId.isEmpty
@@ -112,6 +115,9 @@ struct SettingsProvidersTabView: View {
       }
       let hasKey =
         !viewModel.openAICompatibleAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      SettingsRow(label: "Auth mode") {
+        SettingsMetadata(text: viewModel.openAICompatibleAuthMode.displayName)
+      }
       SettingsRow(label: "API key", showsDivider: false) {
         SettingsMetadata(text: hasKey ? "Stored safely in Keychain" : "Not set")
       }
@@ -165,6 +171,8 @@ struct SettingsProvidersTabView: View {
             onTestComplete: { _ in viewModel.handleLocalTestCompletion() }
           )
         case OpenAICompatibleProviderSettings.providerID:
+          apiProviderOptions
+
           LocalLLMTestView(
             baseURL: $viewModel.openAICompatibleBaseURL,
             modelId: $viewModel.openAICompatibleModelId,
@@ -175,9 +183,12 @@ struct SettingsProvidersTabView: View {
             basePlaceholder: OpenAICompatibleProviderSettings.defaultBaseURL,
             modelPlaceholder: OpenAICompatibleProviderSettings.defaultModelID,
             apiKeyLabel: "API key",
-            apiKeyHelpText: "Stored safely in Keychain and sent as a Bearer token.",
+            apiKeyHelpText: viewModel.openAICompatibleAuthHelpText,
             failureHelpText:
               "Check that the endpoint supports OpenAI Chat Completions with vision input and that the model ID is available for this key.",
+            usesBuiltInCustomAuth: false,
+            additionalHeaders: { viewModel.openAICompatibleAuthHeadersForTest },
+            usesMaxCompletionTokens: viewModel.openAICompatibleUsesMaxCompletionTokens,
             onTestComplete: { success in
               if success {
                 viewModel.handleOpenAICompatibleTestCompletion()
@@ -198,6 +209,83 @@ struct SettingsProvidersTabView: View {
             .font(.custom("Figtree", size: 13))
             .foregroundColor(SettingsStyle.secondary)
         }
+      }
+    }
+  }
+
+  private var apiProviderOptions: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: 6) {
+        Text("Provider profile")
+          .font(.custom("Figtree", size: 12))
+          .fontWeight(.semibold)
+          .foregroundColor(SettingsStyle.secondary)
+
+        Picker("Provider profile", selection: $viewModel.openAICompatibleProfile) {
+          ForEach(OpenAICompatibleProviderProfile.allCases) { profile in
+            Text(profile.displayName).tag(profile)
+          }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .frame(maxWidth: 260, alignment: .leading)
+      }
+
+      HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 6) {
+          Text("Auth header")
+            .font(.custom("Figtree", size: 12))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.secondary)
+
+          Picker("Auth header", selection: $viewModel.openAICompatibleAuthMode) {
+            ForEach(OpenAICompatibleAuthMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          .pickerStyle(.menu)
+          .labelsHidden()
+          .frame(width: 180, alignment: .leading)
+        }
+
+        if viewModel.openAICompatibleAuthMode == .customHeader {
+          VStack(alignment: .leading, spacing: 6) {
+            Text("Header name")
+              .font(.custom("Figtree", size: 12))
+              .fontWeight(.semibold)
+              .foregroundColor(SettingsStyle.secondary)
+
+            TextField(
+              OpenAICompatibleProviderSettings.defaultCustomHeaderName,
+              text: $viewModel.openAICompatibleCustomHeaderName
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 210)
+          }
+        }
+      }
+
+      VStack(alignment: .leading, spacing: 6) {
+        Text("Token parameter")
+          .font(.custom("Figtree", size: 12))
+          .fontWeight(.semibold)
+          .foregroundColor(SettingsStyle.secondary)
+
+        Picker(
+          "Token parameter",
+          selection: $viewModel.openAICompatibleUseMaxCompletionTokensOverride
+        ) {
+          Text("Auto").tag(Optional<Bool>.none)
+          Text("max_tokens").tag(Optional(false))
+          Text("max_completion_tokens").tag(Optional(true))
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: 520)
+
+        Text("Auto uses max_completion_tokens for GPT-5/o-series models and max_tokens otherwise.")
+          .font(.custom("Figtree", size: 11))
+          .foregroundColor(SettingsStyle.meta)
       }
     }
   }

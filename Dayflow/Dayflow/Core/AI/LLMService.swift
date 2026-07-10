@@ -125,7 +125,8 @@ final class LLMService: LLMServicing {
     let modelId =
       modelOverride.isEmpty ? OpenAICompatibleProviderSettings.loadModelID() : modelOverride
     let apiKey = OpenAICompatibleProviderSettings.loadAPIKey()
-    guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    let requiresAPIKey = OpenAICompatibleProviderSettings.loadAuthMode() != .none
+    guard !requiresAPIKey || !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       print("❌ [LLMService] OpenAI-compatible provider unavailable: missing API key")
       return nil
     }

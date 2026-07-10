@@ -491,7 +491,10 @@ final class DailyRecapGenerator {
   private func makeOpenAICompatibleProvider() -> OllamaProvider? {
     let endpoint = OpenAICompatibleProviderSettings.loadBaseURL()
     let apiKey = OpenAICompatibleProviderSettings.loadAPIKey()
-    guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+    let requiresAPIKey = OpenAICompatibleProviderSettings.loadAuthMode() != .none
+    guard !requiresAPIKey || !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      return nil
+    }
     let configuration = OllamaProvider.RuntimeConfiguration.openAICompatible(
       modelId: OpenAICompatibleProviderSettings.loadModelID(),
       apiKey: apiKey,
@@ -520,7 +523,10 @@ final class DailyRecapGenerator {
       .trimmingCharacters(in: .whitespacesAndNewlines)
     let modelId = OpenAICompatibleProviderSettings.loadModelID()
       .trimmingCharacters(in: .whitespacesAndNewlines)
-    return !baseURL.isEmpty && !modelId.isEmpty && OpenAICompatibleProviderSettings.hasAPIKey()
+    let authReady =
+      OpenAICompatibleProviderSettings.loadAuthMode() == .none
+      || OpenAICompatibleProviderSettings.hasAPIKey()
+    return !baseURL.isEmpty && !modelId.isEmpty && authReady
   }
 
   private func resolvedDayflowEndpoint() -> String? {
