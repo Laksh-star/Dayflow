@@ -85,5 +85,9 @@ Good candidates for focused upstream pull requests:
 ## Verification Notes
 
 - Use Xcode or `xcodebuild` with the dev signing team selected.
+- CLI build check:
+  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dayflow/Dayflow.xcodeproj -scheme Dayflow -configuration Debug -derivedDataPath DerivedData build`
+- CLI unit test check:
+  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Dayflow/Dayflow.xcodeproj -scheme Dayflow -destination 'platform=macOS' -derivedDataPath DerivedData`
 - Keep `DerivedData/` and `Dayflow/Config/LocalSecrets.xcconfig` out of commits.
 - After provider or signing changes, restart Dayflow Dev so macOS permission identity and runtime settings are cleanly reloaded.
