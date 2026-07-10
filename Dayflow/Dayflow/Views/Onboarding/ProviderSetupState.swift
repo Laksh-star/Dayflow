@@ -15,6 +15,9 @@ class ProviderSetupState: ObservableObject {
   @Published var localBaseURL: String = LocalEngine.lmstudio.defaultBaseURL
   @Published var localModelId: String = LocalModelPreferences.defaultModelId(for: .lmstudio)
   @Published var localAPIKey: String = UserDefaults.standard.string(forKey: "llmLocalAPIKey") ?? ""
+  @Published var openAICompatibleBaseURL: String = OpenAICompatibleProviderSettings.loadBaseURL()
+  @Published var openAICompatibleModelId: String = OpenAICompatibleProviderSettings.loadModelID()
+  @Published var openAICompatibleAPIKey: String = OpenAICompatibleProviderSettings.loadAPIKey()
   // CLI detection
   @Published var codexCLIStatus: CLIDetectionState = .unknown
   @Published var claudeCLIStatus: CLIDetectionState = .unknown
@@ -127,6 +130,36 @@ class ProviderSetupState: ObservableObject {
       claudeCLIReport = nil
       isCheckingCLIStatus = false
       hasStartedCLICheck = false
+    case OpenAICompatibleProviderSettings.providerID:
+      openAICompatibleBaseURL = OpenAICompatibleProviderSettings.loadBaseURL()
+      openAICompatibleModelId = OpenAICompatibleProviderSettings.loadModelID()
+      openAICompatibleAPIKey = OpenAICompatibleProviderSettings.loadAPIKey()
+      steps = [
+        SetupStep(
+          id: "intro",
+          title: "Before you begin",
+          contentType: .information(
+            "Use an API key",
+            "Connect any OpenAI-compatible chat completions endpoint. OpenAI, OpenRouter, LiteLLM, and self-hosted gateways can work as long as the selected model supports vision input."
+          )
+        ),
+        SetupStep(
+          id: "test",
+          title: "Test connection",
+          contentType: .information(
+            "Test Connection",
+            "Enter a base URL, model ID, and API key, then verify the endpoint can answer a simple vision request."
+          )
+        ),
+        SetupStep(
+          id: "complete",
+          title: "Complete",
+          contentType: .information(
+            "All set!",
+            "Your OpenAI-compatible API provider is configured and ready to use with Dayflow."
+          )
+        ),
+      ]
     default:  // gemini
       steps = [
         SetupStep(

@@ -13,6 +13,8 @@ struct LLMProviderSetupView: View {
     switch activeProviderType {
     case "ollama":
       return "Use local AI"
+    case OpenAICompatibleProviderSettings.providerID:
+      return "Connect API"
     case "chatgpt_claude":
       return "Connect ChatGPT or Claude"
     default:
@@ -461,6 +463,28 @@ struct LLMProviderSetupView: View {
                     setupState.testSuccessful = success
                   }
                 )
+              } else if providerType == OpenAICompatibleProviderSettings.providerID {
+                LocalLLMTestView(
+                  baseURL: $setupState.openAICompatibleBaseURL,
+                  modelId: $setupState.openAICompatibleModelId,
+                  apiKey: $setupState.openAICompatibleAPIKey,
+                  engine: .custom,
+                  showInputs: true,
+                  buttonLabel: "Test API",
+                  basePlaceholder: OpenAICompatibleProviderSettings.defaultBaseURL,
+                  modelPlaceholder: OpenAICompatibleProviderSettings.defaultModelID,
+                  apiKeyLabel: "API key",
+                  apiKeyHelpText: "Stored safely in Keychain and sent as a Bearer token.",
+                  failureHelpText:
+                    "Check that the endpoint supports OpenAI Chat Completions with vision input and that the model ID is available for this key.",
+                  onTestComplete: { success in
+                    setupState.hasTestedConnection = true
+                    setupState.testSuccessful = success
+                    if success {
+                      persistOpenAICompatibleSettings()
+                    }
+                  }
+                )
               } else {
                 // Engine selection: LM Studio or Custom
                 VStack(alignment: .leading, spacing: 12) {
@@ -622,6 +646,13 @@ struct LLMProviderSetupView: View {
       {
         persistLocalSettings()
       }
+    } else if activeProviderType == OpenAICompatibleProviderSettings.providerID {
+      if case .information(let title, _) = setupState.currentStep.contentType,
+        title == "Testing" || title == "Test Connection",
+        setupState.testSuccessful
+      {
+        persistOpenAICompatibleSettings()
+      }
     }
 
     if setupState.isLastStep {
@@ -644,6 +675,10 @@ struct LLMProviderSetupView: View {
     // Save local endpoint for local engine selection
     if activeProviderType == "ollama" {
       persistLocalSettings()
+    }
+
+    if activeProviderType == OpenAICompatibleProviderSettings.providerID {
+      persistOpenAICompatibleSettings()
     }
 
     // Mark setup as complete
@@ -672,6 +707,16 @@ struct LLMProviderSetupView: View {
     } else {
       UserDefaults.standard.set(trimmed, forKey: "llmLocalAPIKey")
     }
+  }
+
+  func persistOpenAICompatibleSettings() {
+    OpenAICompatibleProviderSettings.saveBaseURL(setupState.openAICompatibleBaseURL)
+    OpenAICompatibleProviderSettings.saveModelID(setupState.openAICompatibleModelId)
+    _ = OpenAICompatibleProviderSettings.saveAPIKey(setupState.openAICompatibleAPIKey)
+    let type = LLMProviderType.openAICompatible(
+      endpoint: OpenAICompatibleProviderSettings.loadBaseURL()
+    )
+    type.persist()
   }
 
   func openGoogleAIStudio() {

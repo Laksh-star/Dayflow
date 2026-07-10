@@ -49,6 +49,24 @@ final class ProvidersSettingsViewModel: ObservableObject {
       persistLocalAPIKey(localAPIKey)
     }
   }
+  @Published var openAICompatibleBaseURL: String {
+    didSet {
+      guard oldValue != openAICompatibleBaseURL else { return }
+      OpenAICompatibleProviderSettings.saveBaseURL(openAICompatibleBaseURL)
+    }
+  }
+  @Published var openAICompatibleModelId: String {
+    didSet {
+      guard oldValue != openAICompatibleModelId else { return }
+      OpenAICompatibleProviderSettings.saveModelID(openAICompatibleModelId)
+    }
+  }
+  @Published var openAICompatibleAPIKey: String {
+    didSet {
+      guard oldValue != openAICompatibleAPIKey else { return }
+      persistOpenAICompatibleAPIKey(openAICompatibleAPIKey)
+    }
+  }
   @Published var showLocalModelUpgradeBanner = false
   @Published var isShowingLocalModelUpgradeSheet = false
   @Published var upgradeStatusMessage: String?
@@ -136,6 +154,9 @@ final class ProvidersSettingsViewModel: ObservableObject {
     }
 
     localAPIKey = UserDefaults.standard.string(forKey: "llmLocalAPIKey") ?? ""
+    openAICompatibleBaseURL = OpenAICompatibleProviderSettings.loadBaseURL()
+    openAICompatibleModelId = OpenAICompatibleProviderSettings.loadModelID()
+    openAICompatibleAPIKey = OpenAICompatibleProviderSettings.loadAPIKey()
     if let raw = UserDefaults.standard.string(forKey: "chatCLIPreferredTool") {
       preferredCLITool = CLITool(rawValue: raw)
     } else {
@@ -148,6 +169,7 @@ final class ProvidersSettingsViewModel: ObservableObject {
     loadCurrentProvider()
     loadBackupProvider()
     reloadLocalProviderSettings()
+    reloadOpenAICompatibleProviderSettings()
     LocalModelPreferences.syncPreset(for: localEngine, modelId: localModelId)
     refreshUpgradeBannerState()
     loadGeminiPromptOverridesIfNeeded()
@@ -161,6 +183,12 @@ final class ProvidersSettingsViewModel: ObservableObject {
     LocalModelPreferences.syncPreset(for: localEngine, modelId: localModelId)
     persistLocalAPIKey(localAPIKey)
     refreshUpgradeBannerState()
+  }
+
+  func handleOpenAICompatibleTestCompletion() {
+    OpenAICompatibleProviderSettings.saveBaseURL(openAICompatibleBaseURL)
+    OpenAICompatibleProviderSettings.saveModelID(openAICompatibleModelId)
+    persistOpenAICompatibleAPIKey(openAICompatibleAPIKey)
   }
 
   func markUpgradeBannerKeepLegacy() {
@@ -179,6 +207,8 @@ final class ProvidersSettingsViewModel: ObservableObject {
       loadGeminiPromptOverridesIfNeeded(force: true)
     } else if provider == "ollama" {
       loadOllamaPromptOverridesIfNeeded(force: true)
+    } else if provider == OpenAICompatibleProviderSettings.providerID {
+      reloadOpenAICompatibleProviderSettings()
     } else if provider == "chatgpt_claude" {
       loadChatCLIPromptOverridesIfNeeded(force: true)
     }
@@ -192,6 +222,12 @@ final class ProvidersSettingsViewModel: ObservableObject {
     let raw = UserDefaults.standard.string(forKey: "llmLocalEngine") ?? localEngine.rawValue
     localEngine = LocalEngine(rawValue: raw) ?? localEngine
     LocalModelPreferences.syncPreset(for: localEngine, modelId: localModelId)
+  }
+
+  func reloadOpenAICompatibleProviderSettings() {
+    openAICompatibleBaseURL = OpenAICompatibleProviderSettings.loadBaseURL()
+    openAICompatibleModelId = OpenAICompatibleProviderSettings.loadModelID()
+    openAICompatibleAPIKey = OpenAICompatibleProviderSettings.loadAPIKey()
   }
 
   var usingRecommendedLocalModel: Bool {
@@ -245,6 +281,10 @@ final class ProvidersSettingsViewModel: ObservableObject {
     }
   }
 
+  func persistOpenAICompatibleAPIKey(_ value: String) {
+    _ = OpenAICompatibleProviderSettings.saveAPIKey(value)
+  }
+
   func loadCurrentProvider() {
     guard !hasLoadedProvider else { return }
 
@@ -259,6 +299,9 @@ final class ProvidersSettingsViewModel: ObservableObject {
       currentProvider = "dayflow"
     case .ollamaLocal:
       currentProvider = "ollama"
+    case .openAICompatible:
+      currentProvider = OpenAICompatibleProviderSettings.providerID
+      reloadOpenAICompatibleProviderSettings()
     case .chatGPTClaude:
       currentProvider = "chatgpt_claude"
     }
@@ -338,6 +381,8 @@ final class ProvidersSettingsViewModel: ObservableObject {
 
     if canonicalProviderId(for: providerId) == "ollama" {
       reloadLocalProviderSettings()
+    } else if canonicalProviderId(for: providerId) == OpenAICompatibleProviderSettings.providerID {
+      reloadOpenAICompatibleProviderSettings()
     }
 
     let role = pendingSetupRole ?? .setupOnly
@@ -510,6 +555,15 @@ final class ProvidersSettingsViewModel: ObservableObject {
       let modelId = (UserDefaults.standard.string(forKey: "llmLocalModelId") ?? "")
         .trimmingCharacters(in: .whitespacesAndNewlines)
       return !baseURL.isEmpty && !modelId.isEmpty
+    case OpenAICompatibleProviderSettings.providerID:
+      if UserDefaults.standard.bool(forKey: "\(OpenAICompatibleProviderSettings.providerID)SetupComplete") {
+        return true
+      }
+      let baseURL = OpenAICompatibleProviderSettings.loadBaseURL()
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      let modelId = OpenAICompatibleProviderSettings.loadModelID()
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      return !baseURL.isEmpty && !modelId.isEmpty && OpenAICompatibleProviderSettings.hasAPIKey()
     case "chatgpt_claude":
       if UserDefaults.standard.bool(forKey: "chatgpt_claudeSetupComplete") {
         return true
@@ -608,6 +662,8 @@ final class ProvidersSettingsViewModel: ObservableObject {
       providerType = .ollamaLocal(endpoint: endpoint)
     case "gemini":
       providerType = .geminiDirect
+    case OpenAICompatibleProviderSettings.providerID:
+      providerType = .openAICompatible(endpoint: OpenAICompatibleProviderSettings.loadBaseURL())
     case "dayflow":
       providerType = .dayflowBackend()
     case "chatgpt_claude":
@@ -636,6 +692,8 @@ final class ProvidersSettingsViewModel: ObservableObject {
       let preference = GeminiModelPreference.load()
       selectedGeminiModel = preference.primary
       savedGeminiModel = preference.primary
+    } else if providerId == OpenAICompatibleProviderSettings.providerID {
+      reloadOpenAICompatibleProviderSettings()
     }
 
     AnalyticsService.shared.setPersonProperties(["current_llm_provider": providerId])
@@ -695,6 +753,10 @@ final class ProvidersSettingsViewModel: ObservableObject {
       props["model_id"] = localModelValue
       props["base_url"] = localBaseValue
       props["has_api_key"] = !localAPIKeyValue.isEmpty
+    } else if providerId == OpenAICompatibleProviderSettings.providerID {
+      props["model_id"] = OpenAICompatibleProviderSettings.loadModelID()
+      props["base_url"] = OpenAICompatibleProviderSettings.loadBaseURL()
+      props["has_api_key"] = OpenAICompatibleProviderSettings.hasAPIKey()
     } else if providerId == "chatgpt_claude" {
       props["chat_cli_tool"] =
         UserDefaults.standard.string(forKey: "chatCLIPreferredTool") ?? "unknown"
@@ -744,6 +806,14 @@ final class ProvidersSettingsViewModel: ObservableObject {
         icon: "ChatGPTLogo"
       ),
       CompactProviderInfo(
+        id: OpenAICompatibleProviderSettings.providerID,
+        title: "API",
+        summary: "OpenAI-compatible API key • OpenAI, OpenRouter, LiteLLM",
+        badgeText: "API",
+        badgeType: .blue,
+        icon: "network"
+      ),
+      CompactProviderInfo(
         id: "gemini",
         title: "Gemini",
         summary: "Gemini free tier • fast & accurate",
@@ -778,6 +848,13 @@ final class ProvidersSettingsViewModel: ObservableObject {
       let truncatedModel =
         displayModel.count > 30 ? String(displayModel.prefix(27)) + "..." : displayModel
       return "\(engineName) - \(truncatedModel)"
+    case OpenAICompatibleProviderSettings.providerID:
+      let displayModel =
+        openAICompatibleModelId.isEmpty
+        ? OpenAICompatibleProviderSettings.defaultModelID : openAICompatibleModelId
+      let truncatedModel =
+        displayModel.count > 30 ? String(displayModel.prefix(27)) + "..." : displayModel
+      return "API - \(truncatedModel)"
     case "gemini":
       return selectedGeminiModel.displayName
     case "chatgpt_claude":
@@ -813,6 +890,8 @@ final class ProvidersSettingsViewModel: ObservableObject {
       return "Gemini API"
     case "ollama":
       return "Local API"
+    case OpenAICompatibleProviderSettings.providerID:
+      return "OpenAI-compatible API"
     case "chatgpt_claude":
       if let tool = preferredCLITool {
         return "\(tool.shortName) CLI"
@@ -828,6 +907,7 @@ final class ProvidersSettingsViewModel: ObservableObject {
   func providerDisplayName(_ id: String) -> String {
     switch id {
     case "ollama": return "Local"
+    case OpenAICompatibleProviderSettings.providerID: return "API"
     case "gemini": return "Gemini"
     case "chatgpt": return "ChatGPT"
     case "claude": return "Claude"
@@ -885,6 +965,7 @@ struct CompactProviderInfo: Identifiable {
   var providerTableName: String {
     switch id {
     case "ollama": return "Local"
+    case OpenAICompatibleProviderSettings.providerID: return "API"
     case "gemini": return "Gemini"
     case "chatgpt": return "ChatGPT"
     case "claude": return "Claude"

@@ -7,10 +7,32 @@ import AppKit
 import Foundation
 
 final class OllamaProvider {
+  struct RuntimeConfiguration {
+    let providerName: String
+    let modelId: String
+    let apiKey: String?
+    let authorizationHeaderValue: String?
+
+    static func openAICompatible(modelId: String, apiKey: String?) -> RuntimeConfiguration {
+      let trimmedKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+      let bearer = trimmedKey?.isEmpty == false ? "Bearer \(trimmedKey!)" : nil
+      return RuntimeConfiguration(
+        providerName: OpenAICompatibleProviderSettings.providerID,
+        modelId: modelId,
+        apiKey: trimmedKey?.isEmpty == false ? trimmedKey : nil,
+        authorizationHeaderValue: bearer
+      )
+    }
+  }
+
   let endpoint: String
+  private let runtimeConfiguration: RuntimeConfiguration?
   let screenshotInterval: TimeInterval = 10  // seconds between screenshots
   // Read persisted local settings
   var savedModelId: String {
+    if let runtimeConfiguration {
+      return runtimeConfiguration.modelId
+    }
     if let m = UserDefaults.standard.string(forKey: "llmLocalModelId"), !m.isEmpty {
       return m
     }
@@ -25,6 +47,9 @@ final class OllamaProvider {
     (UserDefaults.standard.string(forKey: "llmLocalEngine") ?? "ollama") == "custom"
   }
   var customAPIKey: String? {
+    if let runtimeConfiguration {
+      return runtimeConfiguration.apiKey
+    }
     let trimmed =
       UserDefaults.standard.string(forKey: "llmLocalAPIKey")?.trimmingCharacters(
         in: .whitespacesAndNewlines) ?? ""
@@ -33,11 +58,28 @@ final class OllamaProvider {
 
   // Get the actual local engine type for analytics tracking
   var localEngine: String {
-    UserDefaults.standard.string(forKey: "llmLocalEngine") ?? "ollama"
+    if let runtimeConfiguration {
+      return runtimeConfiguration.providerName
+    }
+    return UserDefaults.standard.string(forKey: "llmLocalEngine") ?? "ollama"
   }
 
-  init(endpoint: String = "http://localhost:1234") {
+  var authorizationHeaderValue: String? {
+    if let runtimeConfiguration {
+      return runtimeConfiguration.authorizationHeaderValue
+    }
+    if isLMStudio {
+      return "Bearer lm-studio"
+    }
+    if isCustomEngine, let token = customAPIKey {
+      return "Bearer \(token)"
+    }
+    return nil
+  }
+
+  init(endpoint: String = "http://localhost:1234", runtimeConfiguration: RuntimeConfiguration? = nil) {
     self.endpoint = endpoint
+    self.runtimeConfiguration = runtimeConfiguration
   }
 
   // Strip user references from observations to prevent LLM from using third-person language

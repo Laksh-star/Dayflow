@@ -154,6 +154,8 @@ final class DailyRecapGenerator {
     let claudeInstalled = LoginShellRunner.isInstalled("claude")
     let isLocalConfigured = localProviderIsConfigured()
     let localModel = DailyRecapProvider.local.modelOrTool
+    let isAPIConfigured = openAICompatibleProviderIsConfigured()
+    let apiModel = DailyRecapProvider.api.modelOrTool
 
     return [
       .dayflow: DailyRecapProviderAvailability(
@@ -165,6 +167,12 @@ final class DailyRecapGenerator {
         detail: isLocalConfigured
           ? (localModel ?? DailyRecapProvider.local.pickerSubtitle)
           : "Configure Ollama or LM Studio before using this provider"
+      ),
+      .api: DailyRecapProviderAvailability(
+        isAvailable: isAPIConfigured,
+        detail: isAPIConfigured
+          ? (apiModel ?? DailyRecapProvider.api.pickerSubtitle)
+          : "Configure an OpenAI-compatible API key before using this provider"
       ),
       .gemini: DailyRecapProviderAvailability(
         isAvailable: !geminiKey.isEmpty,
@@ -207,6 +215,8 @@ final class DailyRecapGenerator {
       return try await generateWithDayflow(context: context, metadata: metadata)
     case .local:
       return try await generateWithLocal(context: context, metadata: metadata)
+    case .api:
+      return try await generateWithOpenAICompatible(context: context, metadata: metadata)
     case .gemini:
       return try await generateWithGemini(context: context, metadata: metadata)
     case .chatgpt:
@@ -392,6 +402,24 @@ final class DailyRecapGenerator {
     return try makeDraft(from: parsed, context: context, metadata: metadata)
   }
 
+  private func generateWithOpenAICompatible(
+    context: DailyRecapGenerationContext,
+    metadata: DailyStandupGenerationMetadata
+  ) async throws -> DailyStandupDraft {
+    guard openAICompatibleProviderIsConfigured(), let provider = makeOpenAICompatibleProvider()
+    else {
+      throw DailyRecapGeneratorError.missingLocalConfiguration
+    }
+
+    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let (rawText, _) = try await provider.generateText(
+      prompt: prompt,
+      maxTokens: Self.localRecapMaxOutputTokens
+    )
+    let parsed = try Self.parseLocalResponse(rawText)
+    return try makeDraft(from: parsed, context: context, metadata: metadata)
+  }
+
   private func generateWithChatGPT(
     context: DailyRecapGenerationContext,
     metadata: DailyStandupGenerationMetadata
@@ -460,6 +488,17 @@ final class DailyRecapGenerator {
     return OllamaProvider(endpoint: resolvedEndpoint)
   }
 
+  private func makeOpenAICompatibleProvider() -> OllamaProvider? {
+    let endpoint = OpenAICompatibleProviderSettings.loadBaseURL()
+    let apiKey = OpenAICompatibleProviderSettings.loadAPIKey()
+    guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+    let configuration = OllamaProvider.RuntimeConfiguration.openAICompatible(
+      modelId: OpenAICompatibleProviderSettings.loadModelID(),
+      apiKey: apiKey
+    )
+    return OllamaProvider(endpoint: endpoint, runtimeConfiguration: configuration)
+  }
+
   private func localProviderIsConfigured() -> Bool {
     let defaults = UserDefaults.standard
     if defaults.bool(forKey: "ollamaSetupComplete") {
@@ -473,6 +512,14 @@ final class DailyRecapGenerator {
       defaults.string(forKey: "llmLocalModelId")?
       .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     return !baseURL.isEmpty && !modelId.isEmpty
+  }
+
+  private func openAICompatibleProviderIsConfigured() -> Bool {
+    let baseURL = OpenAICompatibleProviderSettings.loadBaseURL()
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let modelId = OpenAICompatibleProviderSettings.loadModelID()
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return !baseURL.isEmpty && !modelId.isEmpty && OpenAICompatibleProviderSettings.hasAPIKey()
   }
 
   private func resolvedDayflowEndpoint() -> String? {

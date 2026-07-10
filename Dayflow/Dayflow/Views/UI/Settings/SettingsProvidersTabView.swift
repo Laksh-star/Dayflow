@@ -101,6 +101,20 @@ struct SettingsProvidersTabView: View {
       SettingsRow(label: "API key", showsDivider: false) {
         SettingsMetadata(text: hasKey ? "Stored in UserDefaults" : "Not set")
       }
+    case OpenAICompatibleProviderSettings.providerID:
+      SettingsRow(label: "Model") {
+        SettingsMetadata(
+          text: viewModel.openAICompatibleModelId.isEmpty
+            ? OpenAICompatibleProviderSettings.defaultModelID : viewModel.openAICompatibleModelId)
+      }
+      SettingsRow(label: "Endpoint") {
+        SettingsMetadata(text: viewModel.openAICompatibleBaseURL)
+      }
+      let hasKey =
+        !viewModel.openAICompatibleAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      SettingsRow(label: "API key", showsDivider: false) {
+        SettingsMetadata(text: hasKey ? "Stored safely in Keychain" : "Not set")
+      }
     case "gemini":
       SettingsRow(label: "Model preference") {
         SettingsMetadata(text: viewModel.selectedGeminiModel.displayName)
@@ -149,6 +163,26 @@ struct SettingsProvidersTabView: View {
             engine: viewModel.localEngine,
             showInputs: viewModel.localEngine == .custom,
             onTestComplete: { _ in viewModel.handleLocalTestCompletion() }
+          )
+        case OpenAICompatibleProviderSettings.providerID:
+          LocalLLMTestView(
+            baseURL: $viewModel.openAICompatibleBaseURL,
+            modelId: $viewModel.openAICompatibleModelId,
+            apiKey: $viewModel.openAICompatibleAPIKey,
+            engine: .custom,
+            showInputs: true,
+            buttonLabel: "Test API",
+            basePlaceholder: OpenAICompatibleProviderSettings.defaultBaseURL,
+            modelPlaceholder: OpenAICompatibleProviderSettings.defaultModelID,
+            apiKeyLabel: "API key",
+            apiKeyHelpText: "Stored safely in Keychain and sent as a Bearer token.",
+            failureHelpText:
+              "Check that the endpoint supports OpenAI Chat Completions with vision input and that the model ID is available for this key.",
+            onTestComplete: { success in
+              if success {
+                viewModel.handleOpenAICompatibleTestCompletion()
+              }
+            }
           )
         case "chatgpt_claude":
           ChatCLITestView(

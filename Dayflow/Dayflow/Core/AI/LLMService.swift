@@ -110,6 +110,20 @@ final class LLMService: LLMServicing {
     OllamaProvider(endpoint: endpoint)
   }
 
+  private func makeOpenAICompatibleProvider(endpoint: String) -> OllamaProvider? {
+    let modelId = OpenAICompatibleProviderSettings.loadModelID()
+    let apiKey = OpenAICompatibleProviderSettings.loadAPIKey()
+    guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      print("❌ [LLMService] OpenAI-compatible provider unavailable: missing API key")
+      return nil
+    }
+    let configuration = OllamaProvider.RuntimeConfiguration.openAICompatible(
+      modelId: modelId,
+      apiKey: apiKey
+    )
+    return OllamaProvider(endpoint: endpoint, runtimeConfiguration: configuration)
+  }
+
   private func makeChatCLIProvider(preferredToolOverride: ChatCLITool? = nil) -> ChatCLIProvider {
     let tool: ChatCLITool
     if let preferredToolOverride {
@@ -220,6 +234,17 @@ final class LLMService: LLMServicing {
       let endpoint =
         UserDefaults.standard.string(forKey: "llmLocalBaseURL") ?? "http://localhost:11434"
       let provider = makeOllamaProvider(endpoint: endpoint)
+      return (
+        actions: BatchProviderActions(
+          transcribeScreenshots: provider.transcribeScreenshots,
+          generateActivityCards: provider.generateActivityCards
+        ), fallbackState: nil
+      )
+    case .openAICompatible:
+      let endpoint = OpenAICompatibleProviderSettings.loadBaseURL()
+      guard let provider = makeOpenAICompatibleProvider(endpoint: endpoint) else {
+        throw noProviderError()
+      }
       return (
         actions: BatchProviderActions(
           transcribeScreenshots: provider.transcribeScreenshots,
@@ -506,6 +531,16 @@ final class LLMService: LLMServicing {
       )
     case .ollamaLocal(let endpoint):
       let provider = makeOllamaProvider(endpoint: endpoint)
+      return TextProviderActions(
+        generateText: { prompt in
+          try await provider.generateText(prompt: prompt)
+        },
+        generateTextStreaming: nil
+      )
+    case .openAICompatible(let endpoint):
+      guard let provider = makeOpenAICompatibleProvider(endpoint: endpoint) else {
+        throw noProviderError()
+      }
       return TextProviderActions(
         generateText: { prompt in
           try await provider.generateText(prompt: prompt)

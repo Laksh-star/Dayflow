@@ -61,6 +61,9 @@ struct LocalLLMTestView: View {
   let buttonLabel: String
   let basePlaceholder: String?
   let modelPlaceholder: String?
+  let apiKeyLabel: String
+  let apiKeyHelpText: String
+  let failureHelpText: String
   let onTestComplete: (Bool) -> Void
 
   init(
@@ -72,6 +75,11 @@ struct LocalLLMTestView: View {
     buttonLabel: String = "Test Local API",
     basePlaceholder: String? = nil,
     modelPlaceholder: String? = nil,
+    apiKeyLabel: String = "API key (optional)",
+    apiKeyHelpText: String =
+      "Stored locally in UserDefaults and sent as a Bearer token for custom endpoints (LiteLLM, OpenRouter, etc.)",
+    failureHelpText: String =
+      "If you get stuck here, you can go back and choose the ‘Bring your own key’ option — it only takes a minute to set up.",
     onTestComplete: @escaping (Bool) -> Void
   ) {
     _baseURL = baseURL
@@ -82,6 +90,9 @@ struct LocalLLMTestView: View {
     self.buttonLabel = buttonLabel
     self.basePlaceholder = basePlaceholder
     self.modelPlaceholder = modelPlaceholder
+    self.apiKeyLabel = apiKeyLabel
+    self.apiKeyHelpText = apiKeyHelpText
+    self.failureHelpText = failureHelpText
     self.onTestComplete = onTestComplete
   }
 
@@ -120,16 +131,14 @@ struct LocalLLMTestView: View {
 
         if engine == .custom {
           VStack(alignment: .leading, spacing: 6) {
-            Text("API key (optional)")
+            Text(apiKeyLabel)
               .font(.custom("Figtree", size: 12))
               .fontWeight(.semibold)
               .foregroundColor(SettingsStyle.secondary)
             SecureField("sk-live-...", text: $apiKey)
               .textFieldStyle(.roundedBorder)
               .disableAutocorrection(true)
-            Text(
-              "Stored locally in UserDefaults and sent as a Bearer token for custom endpoints (LiteLLM, OpenRouter, etc.)"
-            )
+            Text(apiKeyHelpText)
             .font(.custom("Figtree", size: 11))
             .foregroundColor(SettingsStyle.meta)
           }
@@ -148,9 +157,7 @@ struct LocalLLMTestView: View {
       } else if let msg = resultMessage {
         VStack(alignment: .leading, spacing: 6) {
           SettingsStatusDot(state: .bad, label: msg)
-          Text(
-            "If you get stuck here, you can go back and choose the ‘Bring your own key’ option — it only takes a minute to set up."
-          )
+          Text(failureHelpText)
           .font(.custom("Figtree", size: 12))
           .foregroundColor(SettingsStyle.secondary)
           .fixedSize(horizontal: false, vertical: true)

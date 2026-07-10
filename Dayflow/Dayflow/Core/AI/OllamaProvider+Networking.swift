@@ -258,10 +258,8 @@ extension OllamaProvider {
   }
 
   private func applyAuthorizationHeader(to request: inout URLRequest) {
-    if isLMStudio {
-      request.setValue("Bearer lm-studio", forHTTPHeaderField: "Authorization")
-    } else if isCustomEngine, let token = customAPIKey {
-      request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    if let authorizationHeaderValue {
+      request.setValue(authorizationHeaderValue, forHTTPHeaderField: "Authorization")
     }
   }
 }
