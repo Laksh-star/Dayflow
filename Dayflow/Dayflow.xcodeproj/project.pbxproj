@@ -32,7 +32,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		C4C1D2A12DB56805007D5A55 /* Dayflow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dayflow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C4C1D2A12DB56805007D5A55 /* Dayflow Dev.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Dayflow Dev.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4C1D2B22DB56806007D5A55 /* DayflowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DayflowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4C1D2BC2DB56806007D5A55 /* DayflowUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DayflowUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4DF00012EFB100000000001 /* Config/Dayflow.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Dayflow.xcconfig; sourceTree = "<group>"; };
@@ -94,7 +94,7 @@
 		C4C1D2A22DB56805007D5A55 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C4C1D2A12DB56805007D5A55 /* Dayflow.app */,
+				C4C1D2A12DB56805007D5A55 /* Dayflow Dev.app */,
 				C4C1D2B22DB56806007D5A55 /* DayflowTests.xctest */,
 				C4C1D2BC2DB56806007D5A55 /* DayflowUITests.xctest */,
 			);
@@ -128,7 +128,7 @@
 				C4AD00022F0D00010000000B /* MarkdownUI */,
 			);
 			productName = Dayflow;
-			productReference = C4C1D2A12DB56805007D5A55 /* Dayflow.app */;
+			productReference = C4C1D2A12DB56805007D5A55 /* Dayflow Dev.app */;
 			productType = "com.apple.product-type.application";
 		};
 		C4C1D2B12DB56806007D5A55 /* DayflowTests */ = {
@@ -413,13 +413,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Dayflow/Dayflow.entitlements;
-				CODE_SIGN_IDENTITY = "-";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "$(DAYFLOW_CODE_SIGN_IDENTITY)";
+				CODE_SIGN_STYLE = "$(DAYFLOW_CODE_SIGN_STYLE)";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 114;
 				DEVELOPMENT_ASSET_PATHS = "\"Dayflow/Preview Content\"";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = "$(DAYFLOW_DEVELOPMENT_TEAM)";
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -448,13 +447,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Dayflow/Dayflow.entitlements;
-				CODE_SIGN_IDENTITY = "-";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "$(DAYFLOW_CODE_SIGN_IDENTITY)";
+				CODE_SIGN_STYLE = "$(DAYFLOW_CODE_SIGN_STYLE)";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 114;
 				DEVELOPMENT_ASSET_PATHS = "\"Dayflow/Preview Content\"";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = "$(DAYFLOW_DEVELOPMENT_TEAM)";
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
