@@ -40,6 +40,9 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var isOutputLanguageOverrideSaved: Bool = true
   @Published var projectRulesText: String
   @Published var isProjectRulesSaved = true
+  @Published var projectRollups: [ProjectTimeRollup] = []
+  @Published var projectRuleSuggestions: [ProjectRuleSuggestion] = []
+  @Published var projectRollupStatusMessage: String?
 
   @Published var exportStartDate: Date
   @Published var exportEndDate: Date
@@ -100,6 +103,7 @@ final class OtherSettingsViewModel: ObservableObject {
     exportEndDate = timelineDisplayDate(from: Date())
     reprocessDayDate = timelineDisplayDate(from: Date())
     refreshRepairSummary()
+    refreshProjectRollups()
   }
 
   func markOutputLanguageOverrideEdited() {
@@ -130,6 +134,44 @@ final class OtherSettingsViewModel: ObservableObject {
     projectRulesText = projectRulesText.trimmingCharacters(in: .whitespacesAndNewlines)
     ProjectTaggingService.rulesText = projectRulesText
     isProjectRulesSaved = true
+    refreshProjectRollups()
+  }
+
+  func refreshProjectRollups() {
+    let today = DateFormatter.yyyyMMdd.string(from: timelineDisplayDate(from: Date()))
+    let cards = StorageManager.shared.fetchTimelineCards(forDay: today)
+    let rules = ProjectTaggingService.rules(from: projectRulesText)
+    projectRollups = ProjectTaggingService.rollups(for: cards, rules: rules)
+    projectRuleSuggestions = ProjectTaggingService.untaggedSuggestions(for: cards, rules: rules)
+    projectRollupStatusMessage =
+      cards.isEmpty
+      ? "No cards found for today's timeline yet."
+      : "\(cards.count) card\(cards.count == 1 ? "" : "s") scanned for today."
+  }
+
+  func addProjectRuleSuggestion(_ suggestion: ProjectRuleSuggestion) {
+    let pattern = suggestion.pattern.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !pattern.isEmpty else { return }
+
+    let projectName = suggestedProjectName(from: pattern)
+    var lines = projectRulesText
+      .components(separatedBy: .newlines)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    lines.append("\(projectName)=\(pattern)")
+    projectRulesText = lines.joined(separator: "\n")
+    markProjectRulesEdited()
+  }
+
+  private func suggestedProjectName(from pattern: String) -> String {
+    let base = pattern
+      .split(separator: ".")
+      .first
+      .map(String.init) ?? pattern
+    return base
+      .replacingOccurrences(of: "-", with: " ")
+      .replacingOccurrences(of: "_", with: " ")
+      .capitalized
   }
 
   func refreshAnalyticsState() {

@@ -17,6 +17,7 @@ struct SettingsRecordingPrivacyTabView: View {
     ) {
       VStack(alignment: .leading, spacing: 18) {
         privacyPreview
+        presetButtons
         searchField
         installedAppsGrid
           .frame(maxHeight: .infinity, alignment: .top)
@@ -70,6 +71,17 @@ struct SettingsRecordingPrivacyTabView: View {
       }
 
       VStack(alignment: .leading, spacing: 6) {
+        Text(viewModel.previewDecisionTitle)
+          .font(.custom("Figtree", size: 12))
+          .fontWeight(.semibold)
+          .foregroundColor(viewModel.previewMatch == nil ? SettingsStyle.statusGood : SettingsStyle.ink)
+        Text(viewModel.previewDecisionReason)
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+
+        Rectangle().fill(SettingsStyle.divider).frame(height: 1).padding(.vertical, 2)
+
         privacyPreviewLine("App", value: viewModel.previewContext.applicationName ?? "Unknown")
         privacyPreviewLine(
           "Window",
@@ -89,6 +101,23 @@ struct SettingsRecordingPrivacyTabView: View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
           .stroke(SettingsStyle.divider, lineWidth: 1)
       )
+    }
+  }
+
+  private var presetButtons: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text("Rule presets")
+        .font(.custom("Figtree", size: 13))
+        .fontWeight(.semibold)
+        .foregroundColor(SettingsStyle.text)
+
+      HStack(spacing: 8) {
+        ForEach(RecordingPrivacyPreset.allCases) { preset in
+          SettingsSecondaryButton(title: preset.title) {
+            viewModel.applyPreset(preset)
+          }
+        }
+      }
     }
   }
 

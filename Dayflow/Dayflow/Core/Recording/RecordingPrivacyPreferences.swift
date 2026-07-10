@@ -45,6 +45,59 @@ struct RecordingPrivacyMatch: Equatable, Sendable {
   }
 }
 
+enum RecordingPrivacyPreset: String, CaseIterable, Identifiable, Sendable {
+  case gmail
+  case whatsApp
+  case banking
+  case passwordManagers
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .gmail: return "Gmail"
+    case .whatsApp: return "WhatsApp"
+    case .banking: return "Banking"
+    case .passwordManagers: return "Password managers"
+    }
+  }
+
+  var domains: [String] {
+    switch self {
+    case .gmail:
+      return ["mail.google.com", "gmail.com", "inbox.google.com"]
+    case .whatsApp:
+      return ["web.whatsapp.com", "whatsapp.com"]
+    case .banking:
+      return [
+        "bankofamerica.com", "chase.com", "citi.com", "capitalone.com", "wellsfargo.com",
+        "hdfcbank.com", "icicibank.com", "axisbank.com", "onlinesbi.sbi", "netbanking",
+      ]
+    case .passwordManagers:
+      return ["1password.com", "bitwarden.com", "lastpass.com", "dashlane.com"]
+    }
+  }
+
+  var windowTitleKeywords: [String] {
+    switch self {
+    case .gmail:
+      return ["gmail", "compose", "inbox"]
+    case .whatsApp:
+      return ["whatsapp"]
+    case .banking:
+      return [
+        "bank", "banking", "credit card", "debit card", "statement", "upi", "netbanking",
+        "one-time password", "otp",
+      ]
+    case .passwordManagers:
+      return [
+        "password", "passkey", "one-time password", "otp", "1password", "bitwarden", "lastpass",
+        "dashlane", "keychain",
+      ]
+    }
+  }
+}
+
 enum RecordingPrivacyPreferences {
   private static let blockedApplicationIdentifiersKey =
     "recordingPrivacyBlockedApplicationIdentifiers"
@@ -449,7 +502,10 @@ enum RecordingPrivacyPreferences {
   ) -> String? {
     let rules = blockedDomains(defaults: defaults)
     guard !rules.isEmpty else { return nil }
-    return rules.first { domainRuleMatches(rule: $0, text: text) }
+    let domains = domainCandidates(in: text)
+    return rules.first { rule in
+      domainRuleMatches(rule: rule, text: text, domainCandidates: domains)
+    }
   }
 
   private static func matchingWindowTitleRule(
@@ -461,12 +517,39 @@ enum RecordingPrivacyPreferences {
     return rules.first { text.localizedCaseInsensitiveContains($0) }
   }
 
-  private static func domainRuleMatches(rule: String, text: String) -> Bool {
+  private static func domainRuleMatches(
+    rule: String,
+    text: String,
+    domainCandidates: [String] = []
+  ) -> Bool {
     let normalizedText = text.lowercased()
     if normalizedText.contains(rule) { return true }
 
     let bareRule = rule.replacingOccurrences(of: "www.", with: "")
-    return !bareRule.isEmpty && normalizedText.contains(bareRule)
+    if !bareRule.isEmpty && normalizedText.contains(bareRule) { return true }
+
+    return domainCandidates.contains { candidate in
+      candidate == rule || candidate.hasSuffix(".\(rule)") || candidate == bareRule
+        || candidate.hasSuffix(".\(bareRule)")
+    }
+  }
+
+  private static func domainCandidates(in text: String) -> [String] {
+    let pattern = #"(?i)\b(?:https?://)?(?:www\.)?([a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+)\b"#
+    guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+    let range = NSRange(text.startIndex..<text.endIndex, in: text)
+    let matches = regex.matches(in: text, range: range)
+    var seen = Set<String>()
+    return matches.compactMap { match in
+      guard match.numberOfRanges > 1,
+        let swiftRange = Range(match.range(at: 1), in: text)
+      else { return nil }
+      let domain = String(text[swiftRange])
+        .trimmingCharacters(in: CharacterSet(charactersIn: ".,;:()[]{}<>\"'"))
+        .lowercased()
+      guard !domain.isEmpty else { return nil }
+      return seen.insert(domain).inserted ? domain : nil
+    }
   }
 
   @MainActor

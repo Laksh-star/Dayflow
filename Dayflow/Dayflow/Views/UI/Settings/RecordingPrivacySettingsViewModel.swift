@@ -16,6 +16,25 @@ final class RecordingPrivacySettingsViewModel: ObservableObject {
   )
   @Published private(set) var previewMatch: RecordingPrivacyMatch?
 
+  var previewDecisionTitle: String {
+    previewMatch == nil ? "This screenshot would be captured" : "This screenshot would be hidden"
+  }
+
+  var previewDecisionReason: String {
+    guard let match = previewMatch else {
+      return "No app, domain, or window-title privacy rule matched the current frontmost window."
+    }
+
+    switch match.ruleType {
+    case .application:
+      return "Matched blocked app: \(match.displayName) (\(match.matchedValue))."
+    case .domain:
+      return "Matched sensitive domain rule: \(match.matchedValue)."
+    case .windowTitle:
+      return "Matched sensitive window-title keyword: \(match.matchedValue)."
+    }
+  }
+
   init() {
     RecordingPrivacyPreferences.seedDefaultSensitiveRulesIfNeeded()
     blockedIdentifiers = RecordingPrivacyPreferences.blockedApplicationIdentifiers()
@@ -113,6 +132,24 @@ final class RecordingPrivacySettingsViewModel: ObservableObject {
     captureRulesSaved()
   }
 
+  func applyPreset(_ preset: RecordingPrivacyPreset) {
+    let domains = mergeRules(
+      currentText: blockedDomainsText,
+      additions: preset.domains
+    )
+    let keywords = mergeRules(
+      currentText: blockedWindowTitleKeywordsText,
+      additions: preset.windowTitleKeywords
+    )
+
+    RecordingPrivacyPreferences.saveBlockedDomains(domains)
+    RecordingPrivacyPreferences.saveBlockedWindowTitleKeywords(keywords)
+    blockedDomainsText = RecordingPrivacyPreferences.blockedDomainsText()
+    blockedWindowTitleKeywordsText = RecordingPrivacyPreferences.blockedWindowTitleKeywordsText()
+    refreshPreview()
+    captureRulesSaved()
+  }
+
   func refreshPreview() {
     let context = RecordingPrivacyPreferences.frontmostContext()
     previewContext = context
@@ -162,6 +199,16 @@ final class RecordingPrivacySettingsViewModel: ObservableObject {
           .count,
       ]
     )
+  }
+
+  private func mergeRules(currentText: String, additions: [String]) -> [String] {
+    var seen = Set<String>()
+    return (RecordingPrivacyPreferences.rules(from: currentText) + additions)
+      .compactMap { value in
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else { return nil }
+        return seen.insert(normalized).inserted ? normalized : nil
+      }
   }
 
   private static func normalizedIdentifier(_ identifier: String) -> String {

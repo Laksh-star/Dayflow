@@ -147,9 +147,81 @@ struct SettingsDataTabView: View {
             action: viewModel.saveProjectRules
           )
 
+          SettingsSecondaryButton(
+            title: "Refresh rollups",
+            action: viewModel.refreshProjectRollups
+          )
+
           Text("Format: Project=keyword,domain,app")
             .font(.custom("Figtree", size: 12))
             .foregroundColor(SettingsStyle.meta)
+        }
+
+        projectRollupsView
+      }
+    }
+  }
+
+  private var projectRollupsView: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      if let message = viewModel.projectRollupStatusMessage {
+        Text(message)
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.secondary)
+      }
+
+      if !viewModel.projectRollups.isEmpty {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Today by project")
+            .font(.custom("Figtree", size: 13))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.text)
+
+          ForEach(viewModel.projectRollups.prefix(8)) { rollup in
+            HStack(spacing: 10) {
+              Text(rollup.project)
+                .font(.custom("Figtree", size: 12))
+                .fontWeight(.semibold)
+                .foregroundColor(SettingsStyle.text)
+                .frame(width: 150, alignment: .leading)
+              Text("\(rollup.minutes) min")
+                .font(.custom("Figtree", size: 12))
+                .foregroundColor(SettingsStyle.secondary)
+                .frame(width: 70, alignment: .leading)
+              Text("\(rollup.cardCount) card\(rollup.cardCount == 1 ? "" : "s")")
+                .font(.custom("Figtree", size: 12))
+                .foregroundColor(SettingsStyle.meta)
+              Spacer()
+            }
+          }
+        }
+      }
+
+      if !viewModel.projectRuleSuggestions.isEmpty {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Suggested mappings from untagged cards")
+            .font(.custom("Figtree", size: 13))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.text)
+
+          ForEach(viewModel.projectRuleSuggestions.prefix(6)) { suggestion in
+            HStack(spacing: 10) {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(suggestion.pattern)
+                  .font(.custom("Figtree", size: 12))
+                  .fontWeight(.semibold)
+                  .foregroundColor(SettingsStyle.text)
+                Text("\(suggestion.source) • \(suggestion.minutes) min • \(suggestion.cardTitle)")
+                  .font(.custom("Figtree", size: 11))
+                  .foregroundColor(SettingsStyle.meta)
+                  .lineLimit(1)
+              }
+              Spacer()
+              SettingsSecondaryButton(title: "Add") {
+                viewModel.addProjectRuleSuggestion(suggestion)
+              }
+            }
+          }
         }
       }
     }

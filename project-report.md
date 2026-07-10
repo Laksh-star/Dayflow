@@ -45,6 +45,9 @@ This file tracks the local development work added on top of the upstream
 - Added app-level screenshot exclusion controls in Settings.
 - Added domain and window-title sensitive rules for capture blocking.
 - Added current-window preview status so the user can see whether recording is allowed.
+- Added v2 diagnostics that explain whether the current screenshot would be captured or hidden and why.
+- Added rule presets for Gmail, WhatsApp, banking, and password managers.
+- Improved browser-domain matching by extracting URL/domain candidates from window titles.
 
 ### Reprocess and repair controls
 
@@ -57,6 +60,8 @@ This file tracks the local development work added on top of the upstream
 ### Project and standup utilities
 
 - Added project/client tagging rules based on keywords, domains, apps, and card text.
+- Added Settings rollups for today's time by project/client.
+- Added suggested project mappings from untagged observed cards.
 - Added standup composer for Yesterday / Today / Blockers text.
 
 ## Local-only Changes
@@ -85,6 +90,7 @@ Good candidates for focused upstream pull requests:
 - Repair retries do not yet let the user select an arbitrary custom endpoint per run.
 - Privacy preview is app/window oriented; it does not yet show screenshot redaction thumbnails.
 - Project tagging is rules-based and lightweight; it does not yet infer repo paths or Git metadata.
+- Suggested project mappings currently append simple `Project=pattern` rules and do not edit existing project rows in place.
 
 ## Verification Notes
 

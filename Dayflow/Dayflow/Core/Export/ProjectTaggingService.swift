@@ -14,6 +14,15 @@ struct ProjectTimeRollup: Identifiable, Equatable, Sendable {
   var id: String { project }
 }
 
+struct ProjectRuleSuggestion: Identifiable, Equatable, Sendable {
+  let pattern: String
+  let source: String
+  let cardTitle: String
+  let minutes: Int
+
+  var id: String { pattern }
+}
+
 enum ProjectTaggingService {
   private static let rulesKey = "projectTaggingRulesText"
 
@@ -101,6 +110,40 @@ enum ProjectTaggingService {
     }
   }
 
+  static func untaggedSuggestions(
+    for cards: [TimelineCard],
+    rules: [ProjectTaggingRule] = rules(),
+    limit: Int = 8
+  ) -> [ProjectRuleSuggestion] {
+    let taggedPatterns = Set(rules.flatMap(\.patterns))
+    var scores: [String: (source: String, title: String, minutes: Int)] = [:]
+
+    for card in cards where project(for: card, rules: rules) == nil {
+      let minutes = max(1, durationMinutes(for: card) ?? 0)
+      for (pattern, source) in suggestionPatterns(for: card) {
+        guard !taggedPatterns.contains(pattern) else { continue }
+        var current = scores[pattern] ?? (source, card.title, 0)
+        current.minutes += minutes
+        scores[pattern] = current
+      }
+    }
+
+    return scores.map { pattern, value in
+      ProjectRuleSuggestion(
+        pattern: pattern,
+        source: value.source,
+        cardTitle: value.title,
+        minutes: value.minutes
+      )
+    }
+    .sorted {
+      if $0.minutes != $1.minutes { return $0.minutes > $1.minutes }
+      return $0.pattern.localizedCaseInsensitiveCompare($1.pattern) == .orderedAscending
+    }
+    .prefix(limit)
+    .map { $0 }
+  }
+
   static func durationMinutes(for card: TimelineCard) -> Int? {
     guard
       let dayDate = DateFormatter.yyyyMMdd.date(from: card.day),
@@ -156,6 +199,43 @@ enum ProjectTaggingService {
     .compactMap { $0 }
     .joined(separator: " ")
     .lowercased()
+  }
+
+  private static func suggestionPatterns(for card: TimelineCard) -> [(String, String)] {
+    var candidates: [(String, String)] = []
+    if let primary = normalizedPattern(card.appSites?.primary) {
+      candidates.append((primary, "Primary app/site"))
+    }
+    if let secondary = normalizedPattern(card.appSites?.secondary), secondary != candidates.first?.0 {
+      candidates.append((secondary, "Secondary app/site"))
+    }
+
+    for token in [card.title, card.category, card.subcategory] {
+      if let normalized = normalizedPattern(token), normalized.count >= 4 {
+        candidates.append((normalized, "Card text"))
+      }
+    }
+
+    var seen = Set<String>()
+    return candidates.filter { candidate in
+      seen.insert(candidate.0).inserted
+    }
+  }
+
+  private static func normalizedPattern(_ value: String?) -> String? {
+    guard var normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+      !normalized.isEmpty
+    else { return nil }
+    normalized = normalized
+      .replacingOccurrences(of: "https://", with: "")
+      .replacingOccurrences(of: "http://", with: "")
+    if let slashIndex = normalized.firstIndex(of: "/") {
+      normalized = String(normalized[..<slashIndex])
+    }
+    let trimmed = normalized.trimmingCharacters(
+      in: CharacterSet.alphanumerics.inverted
+    )
+    return trimmed.isEmpty ? nil : trimmed
   }
 
   private static let timeFormatter: DateFormatter = {
