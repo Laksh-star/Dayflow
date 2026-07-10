@@ -15,6 +15,28 @@ This file tracks the local development work added on top of the upstream
 - App name: `Dayflow Dev`
 - Dev bundle ID: `teleportlabs.com.Dayflow.dev`
 - Dev data directory: `~/Library/Application Support/DayflowDev/`
+- Fork remote: `https://github.com/Laksh-star/Dayflow.git`
+- Latest pushed commit: `29be612 Add privacy diagnostics and project rollups`
+
+## Current Status
+
+- The dev fork is buildable and has a working shared Xcode scheme.
+- The CLI unit test path is working and currently covers provider settings, weekly dashboard logic, time parsing, privacy matching, and project-rule suggestions.
+- The paid/public app can remain uninstalled or unused while this fork is the active local Dayflow build.
+- New Settings areas now cover export, reprocess/repair, privacy rules, provider routing/API configuration, project tagging, and standup composition.
+
+## Recent Commit Ledger
+
+- `29be612` - Add privacy diagnostics, privacy presets, improved domain matching, project rollups, and suggested project mappings.
+- `bb582fb` - Generalize API provider settings with profiles, auth modes, and token-parameter controls.
+- `b9c4012` - Add shared dev test scheme and fix the Dayflow Dev unit-test host/module setup.
+- `26f77dd` - Add repair-run provider/model override controls and create this fork report.
+- `0d075a2` - Add repair controls, project tagging basics, standup composer, and Markdown v2 export workflow upgrades.
+- `0de4c33` - Add privacy rules for recording capture.
+- `353e853` - Keep local signing settings out of project metadata.
+- `bc2e44e` - Improve API provider card generation.
+- `7764e7b` - Support `max_completion_tokens` for newer OpenAI models.
+- `89241e5` - Add OpenAI-compatible API provider.
 
 ## Implemented Changes
 
@@ -82,6 +104,14 @@ Good candidates for focused upstream pull requests:
 - Failed-batch repair controls.
 - Standup composer and project tagging, if framed as optional productivity tools.
 
+Recommended upstream order:
+
+1. Markdown export v2.
+2. OpenAI-compatible API provider.
+3. Privacy exclusion rules.
+4. Failed-batch repair controls.
+5. Project tagging and standup composer.
+
 ## Known Gaps
 
 - API provider compatibility is currently OpenAI-compatible chat/completions oriented, not a fully generic provider abstraction.
@@ -91,6 +121,15 @@ Good candidates for focused upstream pull requests:
 - Privacy preview is app/window oriented; it does not yet show screenshot redaction thumbnails.
 - Project tagging is rules-based and lightweight; it does not yet infer repo paths or Git metadata.
 - Suggested project mappings currently append simple `Project=pattern` rules and do not edit existing project rows in place.
+
+## Next Priorities
+
+1. Run Dayflow Dev for another real work session and validate cards, privacy blocking, repair retries, exports, and project rollups against actual usage.
+2. Add API provider v2 support for arbitrary extra headers and provider-specific request metadata.
+3. Add screenshot/redaction thumbnail preview for privacy rules.
+4. Improve project tagging edits so suggestions can merge into existing project rows instead of always appending new rules.
+5. Start Git/repo context enrichment for project inference.
+6. Prepare a clean upstream Markdown export branch if we decide to open the first PR.
 
 ## Verification Notes
 
