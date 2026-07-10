@@ -119,7 +119,8 @@ final class LLMService: LLMServicing {
     }
     let configuration = OllamaProvider.RuntimeConfiguration.openAICompatible(
       modelId: modelId,
-      apiKey: apiKey
+      apiKey: apiKey,
+      baseURL: endpoint
     )
     return OllamaProvider(endpoint: endpoint, runtimeConfiguration: configuration)
   }

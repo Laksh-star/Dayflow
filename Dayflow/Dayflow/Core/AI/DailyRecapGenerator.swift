@@ -494,7 +494,8 @@ final class DailyRecapGenerator {
     guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
     let configuration = OllamaProvider.RuntimeConfiguration.openAICompatible(
       modelId: OpenAICompatibleProviderSettings.loadModelID(),
-      apiKey: apiKey
+      apiKey: apiKey,
+      baseURL: endpoint
     )
     return OllamaProvider(endpoint: endpoint, runtimeConfiguration: configuration)
   }

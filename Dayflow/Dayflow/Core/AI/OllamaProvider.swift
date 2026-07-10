@@ -12,15 +12,22 @@ final class OllamaProvider {
     let modelId: String
     let apiKey: String?
     let authorizationHeaderValue: String?
+    let usesMaxCompletionTokens: Bool
 
-    static func openAICompatible(modelId: String, apiKey: String?) -> RuntimeConfiguration {
+    static func openAICompatible(
+      modelId: String, apiKey: String?, baseURL: String
+    ) -> RuntimeConfiguration {
       let trimmedKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
       let bearer = trimmedKey?.isEmpty == false ? "Bearer \(trimmedKey!)" : nil
       return RuntimeConfiguration(
         providerName: OpenAICompatibleProviderSettings.providerID,
         modelId: modelId,
         apiKey: trimmedKey?.isEmpty == false ? trimmedKey : nil,
-        authorizationHeaderValue: bearer
+        authorizationHeaderValue: bearer,
+        usesMaxCompletionTokens: OpenAICompatibleProviderSettings.usesMaxCompletionTokens(
+          modelId: modelId,
+          baseURL: baseURL
+        )
       )
     }
   }
@@ -75,6 +82,10 @@ final class OllamaProvider {
       return "Bearer \(token)"
     }
     return nil
+  }
+
+  var usesMaxCompletionTokens: Bool {
+    runtimeConfiguration?.usesMaxCompletionTokens ?? false
   }
 
   init(endpoint: String = "http://localhost:1234", runtimeConfiguration: RuntimeConfiguration? = nil) {

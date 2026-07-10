@@ -65,7 +65,7 @@ extension OllamaProvider {
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         applyAuthorizationHeader(to: &urlRequest)
-        urlRequest.httpBody = try JSONEncoder().encode(request)
+        urlRequest.httpBody = try encodedChatRequest(request)
         urlRequest.timeoutInterval = 60.0  // 60-second timeout
 
         let start = Date()
@@ -190,7 +190,7 @@ extension OllamaProvider {
           if operation == "describe_frame" {
             fallbackBodyForLogging = nil
           } else {
-            fallbackBodyForLogging = try? JSONEncoder().encode(request)
+            fallbackBodyForLogging = try? encodedChatRequest(request)
           }
           let ctx =
             ctxForAttempt
@@ -261,6 +261,21 @@ extension OllamaProvider {
     if let authorizationHeaderValue {
       request.setValue(authorizationHeaderValue, forHTTPHeaderField: "Authorization")
     }
+  }
+
+  private func encodedChatRequest(_ request: ChatRequest) throws -> Data {
+    let encoded = try JSONEncoder().encode(request)
+    guard usesMaxCompletionTokens else { return encoded }
+
+    guard var payload = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else {
+      return encoded
+    }
+
+    if let maxTokens = payload.removeValue(forKey: "max_tokens") {
+      payload["max_completion_tokens"] = maxTokens
+    }
+
+    return try JSONSerialization.data(withJSONObject: payload, options: [])
   }
 }
 

@@ -48,4 +48,10 @@ enum OpenAICompatibleProviderSettings {
   static func hasAPIKey() -> Bool {
     !loadAPIKey().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
+
+  static func usesMaxCompletionTokens(modelId: String, baseURL: String) -> Bool {
+    let normalizedModel = modelId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    return normalizedModel.hasPrefix("gpt-5") || normalizedModel.hasPrefix("o1")
+      || normalizedModel.hasPrefix("o3") || normalizedModel.hasPrefix("o4")
+  }
 }

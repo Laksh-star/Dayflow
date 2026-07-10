@@ -189,7 +189,11 @@ struct LocalLLMTestView: View {
           ]
         )
       ],
-      maxTokens: 10
+      maxTokens: 10,
+      usesMaxCompletionTokens: OpenAICompatibleProviderSettings.usesMaxCompletionTokens(
+        modelId: modelId,
+        baseURL: baseURL
+      )
     )
 
     var request = URLRequest(url: url)
@@ -247,10 +251,29 @@ struct LocalLLMTestView: View {
   }
 }
 
-struct LocalLLMChatRequest: Codable {
+struct LocalLLMChatRequest: Encodable {
   let model: String
   let messages: [LocalLLMChatMessage]
   let maxTokens: Int
+  let usesMaxCompletionTokens: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case model
+    case messages
+    case maxTokens = "max_tokens"
+    case maxCompletionTokens = "max_completion_tokens"
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(model, forKey: .model)
+    try container.encode(messages, forKey: .messages)
+    if usesMaxCompletionTokens {
+      try container.encode(maxTokens, forKey: .maxCompletionTokens)
+    } else {
+      try container.encode(maxTokens, forKey: .maxTokens)
+    }
+  }
 }
 
 struct LocalLLMChatMessage: Codable {
