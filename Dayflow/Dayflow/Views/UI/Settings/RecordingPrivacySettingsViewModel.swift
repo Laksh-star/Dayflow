@@ -1,14 +1,27 @@
+import AppKit
 import Foundation
 
 @MainActor
 final class RecordingPrivacySettingsViewModel: ObservableObject {
   @Published var searchText = ""
+  @Published var blockedDomainsText: String
+  @Published var blockedWindowTitleKeywordsText: String
   @Published private(set) var installedApplications: [RecordingPrivacyApplication] = []
   @Published private(set) var blockedIdentifiers: [String]
   @Published private(set) var isLoadingApplications = false
+  @Published private(set) var previewContext = RecordingPrivacyContext(
+    applicationName: nil,
+    bundleIdentifier: nil,
+    windowTitle: nil
+  )
+  @Published private(set) var previewMatch: RecordingPrivacyMatch?
 
   init() {
+    RecordingPrivacyPreferences.seedDefaultSensitiveRulesIfNeeded()
     blockedIdentifiers = RecordingPrivacyPreferences.blockedApplicationIdentifiers()
+    blockedDomainsText = RecordingPrivacyPreferences.blockedDomainsText()
+    blockedWindowTitleKeywordsText = RecordingPrivacyPreferences.blockedWindowTitleKeywordsText()
+    refreshPreview()
   }
 
   var filteredApplications: [RecordingPrivacyApplication] {
@@ -39,6 +52,7 @@ final class RecordingPrivacySettingsViewModel: ObservableObject {
 
   func handleOnAppear() {
     loadInstalledApplicationsIfNeeded()
+    refreshPreview()
   }
 
   func loadInstalledApplicationsIfNeeded() {
@@ -85,6 +99,26 @@ final class RecordingPrivacySettingsViewModel: ObservableObject {
     saveBlockedIdentifiers()
   }
 
+  func saveDomainRules() {
+    RecordingPrivacyPreferences.saveBlockedDomainsText(blockedDomainsText)
+    blockedDomainsText = RecordingPrivacyPreferences.blockedDomainsText()
+    refreshPreview()
+    captureRulesSaved()
+  }
+
+  func saveWindowTitleRules() {
+    RecordingPrivacyPreferences.saveBlockedWindowTitleKeywordsText(blockedWindowTitleKeywordsText)
+    blockedWindowTitleKeywordsText = RecordingPrivacyPreferences.blockedWindowTitleKeywordsText()
+    refreshPreview()
+    captureRulesSaved()
+  }
+
+  func refreshPreview() {
+    let context = RecordingPrivacyPreferences.frontmostContext()
+    previewContext = context
+    previewMatch = RecordingPrivacyPreferences.privacyMatch(for: context)
+  }
+
   func handleApplicationDrop(providers: [NSItemProvider]) -> Bool {
     for provider in providers where provider.canLoadObject(ofClass: NSString.self) {
       provider.loadObject(ofClass: NSString.self) { [weak self] object, _ in
@@ -114,10 +148,19 @@ final class RecordingPrivacySettingsViewModel: ObservableObject {
   private func saveBlockedIdentifiers() {
     RecordingPrivacyPreferences.saveBlockedApplicationIdentifiers(blockedIdentifiers)
     blockedIdentifiers = RecordingPrivacyPreferences.blockedApplicationIdentifiers()
+    refreshPreview()
+    captureRulesSaved()
+  }
 
+  private func captureRulesSaved() {
     AnalyticsService.shared.capture(
       "recording_privacy_rules_saved",
-      ["blocked_app_count": blockedIdentifiers.count]
+      [
+        "blocked_app_count": blockedIdentifiers.count,
+        "blocked_domain_count": RecordingPrivacyPreferences.blockedDomains().count,
+        "blocked_window_title_count": RecordingPrivacyPreferences.blockedWindowTitleKeywords()
+          .count,
+      ]
     )
   }
 

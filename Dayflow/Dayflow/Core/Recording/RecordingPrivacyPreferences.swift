@@ -16,10 +16,42 @@ struct RecordingPrivacyApplication: Identifiable, Equatable, Sendable {
   }
 }
 
+struct RecordingPrivacyContext: Equatable, Sendable {
+  let applicationName: String?
+  let bundleIdentifier: String?
+  let windowTitle: String?
+}
+
+struct RecordingPrivacyMatch: Equatable, Sendable {
+  enum RuleType: String, Sendable {
+    case application
+    case domain
+    case windowTitle
+  }
+
+  let ruleType: RuleType
+  let matchedValue: String
+  let displayName: String
+
+  var placeholderApplicationName: String {
+    switch ruleType {
+    case .application:
+      return displayName
+    case .domain:
+      return matchedValue
+    case .windowTitle:
+      return "Private window"
+    }
+  }
+}
+
 enum RecordingPrivacyPreferences {
   private static let blockedApplicationIdentifiersKey =
     "recordingPrivacyBlockedApplicationIdentifiers"
+  private static let blockedDomainsKey = "recordingPrivacyBlockedDomains"
+  private static let blockedWindowTitleKeywordsKey = "recordingPrivacyBlockedWindowTitleKeywords"
   private static let didSeedDefaultSecretAppsKey = "recordingPrivacyDidSeedDefaultSecretApps"
+  private static let didSeedDefaultSensitiveRulesKey = "recordingPrivacyDidSeedDefaultSensitiveRules"
 
   private static let defaultSecretAppNames: Set<String> = [
     "1password",
@@ -59,6 +91,26 @@ enum RecordingPrivacyPreferences {
     "yubico",
   ]
 
+  private static let defaultSensitiveDomains = [
+    "mail.google.com",
+    "gmail.com",
+    "web.whatsapp.com",
+  ]
+
+  private static let defaultSensitiveWindowTitleKeywords = [
+    "bank",
+    "banking",
+    "credit card",
+    "debit card",
+    "gmail",
+    "one-time password",
+    "otp",
+    "passkey",
+    "password",
+    "upi",
+    "whatsapp",
+  ]
+
   static func blockedApplicationIdentifiers(defaults: UserDefaults = .standard) -> [String] {
     let stored = defaults.stringArray(forKey: blockedApplicationIdentifiersKey) ?? []
     return normalizedIdentifiers(from: stored)
@@ -66,6 +118,24 @@ enum RecordingPrivacyPreferences {
 
   static func blockedApplicationsText(defaults: UserDefaults = .standard) -> String {
     blockedApplicationIdentifiers(defaults: defaults).joined(separator: "\n")
+  }
+
+  static func blockedDomains(defaults: UserDefaults = .standard) -> [String] {
+    let stored = defaults.stringArray(forKey: blockedDomainsKey) ?? []
+    return normalizedRules(from: stored)
+  }
+
+  static func blockedWindowTitleKeywords(defaults: UserDefaults = .standard) -> [String] {
+    let stored = defaults.stringArray(forKey: blockedWindowTitleKeywordsKey) ?? []
+    return normalizedRules(from: stored)
+  }
+
+  static func blockedDomainsText(defaults: UserDefaults = .standard) -> String {
+    blockedDomains(defaults: defaults).joined(separator: "\n")
+  }
+
+  static func blockedWindowTitleKeywordsText(defaults: UserDefaults = .standard) -> String {
+    blockedWindowTitleKeywords(defaults: defaults).joined(separator: "\n")
   }
 
   static func saveBlockedApplicationsText(
@@ -80,6 +150,34 @@ enum RecordingPrivacyPreferences {
     defaults: UserDefaults = .standard
   ) {
     defaults.set(normalizedIdentifiers(from: identifiers), forKey: blockedApplicationIdentifiersKey)
+  }
+
+  static func saveBlockedDomains(
+    _ domains: [String],
+    defaults: UserDefaults = .standard
+  ) {
+    defaults.set(normalizedRules(from: domains), forKey: blockedDomainsKey)
+  }
+
+  static func saveBlockedWindowTitleKeywords(
+    _ keywords: [String],
+    defaults: UserDefaults = .standard
+  ) {
+    defaults.set(normalizedRules(from: keywords), forKey: blockedWindowTitleKeywordsKey)
+  }
+
+  static func saveBlockedDomainsText(
+    _ text: String,
+    defaults: UserDefaults = .standard
+  ) {
+    saveBlockedDomains(rules(from: text), defaults: defaults)
+  }
+
+  static func saveBlockedWindowTitleKeywordsText(
+    _ text: String,
+    defaults: UserDefaults = .standard
+  ) {
+    saveBlockedWindowTitleKeywords(rules(from: text), defaults: defaults)
   }
 
   static func seedDefaultSecretApplicationsIfNeeded(
@@ -98,8 +196,26 @@ enum RecordingPrivacyPreferences {
     defaults.set(true, forKey: didSeedDefaultSecretAppsKey)
   }
 
+  static func seedDefaultSensitiveRulesIfNeeded(defaults: UserDefaults = .standard) {
+    guard !defaults.bool(forKey: didSeedDefaultSensitiveRulesKey) else { return }
+
+    saveBlockedDomains(
+      blockedDomains(defaults: defaults) + defaultSensitiveDomains,
+      defaults: defaults
+    )
+    saveBlockedWindowTitleKeywords(
+      blockedWindowTitleKeywords(defaults: defaults) + defaultSensitiveWindowTitleKeywords,
+      defaults: defaults
+    )
+    defaults.set(true, forKey: didSeedDefaultSensitiveRulesKey)
+  }
+
   static func identifiers(from text: String) -> [String] {
     normalizedIdentifiers(from: text.components(separatedBy: .newlines))
+  }
+
+  static func rules(from text: String) -> [String] {
+    normalizedRules(from: text.components(separatedBy: .newlines))
   }
 
   static func isApplicationBlocked(
@@ -118,24 +234,65 @@ enum RecordingPrivacyPreferences {
     return candidates.contains { blocked.contains($0) }
   }
 
-  @MainActor
-  static func frontmostBlockedApplication(
+  static func privacyMatch(
+    for context: RecordingPrivacyContext,
     defaults: UserDefaults = .standard
-  ) -> RecordingPrivacyApplication? {
-    guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
-    guard
-      isApplicationBlocked(
-        bundleIdentifier: app.bundleIdentifier,
-        applicationName: app.localizedName,
-        defaults: defaults
+  ) -> RecordingPrivacyMatch? {
+    if isApplicationBlocked(
+      bundleIdentifier: context.bundleIdentifier,
+      applicationName: context.applicationName,
+      defaults: defaults
+    ) {
+      let matchedValue = context.bundleIdentifier ?? context.applicationName ?? "private-app"
+      return RecordingPrivacyMatch(
+        ruleType: .application,
+        matchedValue: matchedValue,
+        displayName: context.applicationName ?? matchedValue
       )
-    else {
-      return nil
     }
 
-    return RecordingPrivacyApplication(
-      name: app.localizedName ?? app.bundleIdentifier ?? "Private app",
-      bundleIdentifier: app.bundleIdentifier ?? app.localizedName ?? "private-app"
+    if let windowTitle = normalizedSearchText(context.windowTitle), !windowTitle.isEmpty {
+      if let domain = matchingDomainRule(in: windowTitle, defaults: defaults) {
+        return RecordingPrivacyMatch(
+          ruleType: .domain,
+          matchedValue: domain,
+          displayName: context.applicationName ?? domain
+        )
+      }
+
+      if let keyword = matchingWindowTitleRule(in: windowTitle, defaults: defaults) {
+        return RecordingPrivacyMatch(
+          ruleType: .windowTitle,
+          matchedValue: keyword,
+          displayName: context.applicationName ?? "Private window"
+        )
+      }
+    }
+
+    return nil
+  }
+
+  @MainActor
+  static func frontmostPrivacyMatch(
+    defaults: UserDefaults = .standard
+  ) -> RecordingPrivacyMatch? {
+    privacyMatch(for: frontmostContext(), defaults: defaults)
+  }
+
+  @MainActor
+  static func frontmostContext() -> RecordingPrivacyContext {
+    guard let app = NSWorkspace.shared.frontmostApplication else {
+      return RecordingPrivacyContext(
+        applicationName: nil,
+        bundleIdentifier: nil,
+        windowTitle: nil
+      )
+    }
+
+    return RecordingPrivacyContext(
+      applicationName: app.localizedName,
+      bundleIdentifier: app.bundleIdentifier,
+      windowTitle: frontmostWindowTitle(for: app.processIdentifier)
     )
   }
 
@@ -244,6 +401,14 @@ enum RecordingPrivacyPreferences {
     }
   }
 
+  private static func normalizedRules(from values: [String]) -> [String] {
+    var seen = Set<String>()
+    return values.compactMap { value in
+      guard let normalized = normalizedRule(value) else { return nil }
+      return seen.insert(normalized).inserted ? normalized : nil
+    }
+  }
+
   private static func normalizedIdentifier(_ value: String?) -> String? {
     guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
       !trimmed.isEmpty
@@ -251,6 +416,87 @@ enum RecordingPrivacyPreferences {
       return nil
     }
     return trimmed.lowercased()
+  }
+
+  private static func normalizedRule(_ value: String?) -> String? {
+    guard var trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !trimmed.isEmpty
+    else {
+      return nil
+    }
+
+    trimmed = trimmed
+      .replacingOccurrences(of: "https://", with: "")
+      .replacingOccurrences(of: "http://", with: "")
+    if let slashIndex = trimmed.firstIndex(of: "/") {
+      trimmed = String(trimmed[..<slashIndex])
+    }
+    return trimmed.lowercased()
+  }
+
+  private static func normalizedSearchText(_ value: String?) -> String? {
+    guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !trimmed.isEmpty
+    else {
+      return nil
+    }
+    return trimmed.lowercased()
+  }
+
+  private static func matchingDomainRule(
+    in text: String,
+    defaults: UserDefaults
+  ) -> String? {
+    let rules = blockedDomains(defaults: defaults)
+    guard !rules.isEmpty else { return nil }
+    return rules.first { domainRuleMatches(rule: $0, text: text) }
+  }
+
+  private static func matchingWindowTitleRule(
+    in text: String,
+    defaults: UserDefaults
+  ) -> String? {
+    let rules = blockedWindowTitleKeywords(defaults: defaults)
+    guard !rules.isEmpty else { return nil }
+    return rules.first { text.localizedCaseInsensitiveContains($0) }
+  }
+
+  private static func domainRuleMatches(rule: String, text: String) -> Bool {
+    let normalizedText = text.lowercased()
+    if normalizedText.contains(rule) { return true }
+
+    let bareRule = rule.replacingOccurrences(of: "www.", with: "")
+    return !bareRule.isEmpty && normalizedText.contains(bareRule)
+  }
+
+  @MainActor
+  private static func frontmostWindowTitle(for processIdentifier: pid_t) -> String? {
+    guard
+      let windows = CGWindowListCopyWindowInfo(
+        [.optionOnScreenOnly, .excludeDesktopElements],
+        kCGNullWindowID
+      ) as? [[String: Any]]
+    else {
+      return nil
+    }
+
+    for window in windows {
+      guard let ownerPID = window[kCGWindowOwnerPID as String] as? pid_t,
+        ownerPID == processIdentifier
+      else {
+        continue
+      }
+      guard let layer = window[kCGWindowLayer as String] as? Int, layer == 0 else {
+        continue
+      }
+      guard let title = window[kCGWindowName as String] as? String,
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      else {
+        continue
+      }
+      return title
+    }
+    return nil
   }
 
   private static func applicationSearchRoots(fileManager: FileManager) -> [URL] {

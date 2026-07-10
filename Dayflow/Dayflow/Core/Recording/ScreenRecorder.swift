@@ -353,15 +353,15 @@ final class ScreenRecorder: NSObject, @unchecked Sendable {
 
     do {
       let captureSize = scaledCaptureSize(for: display)
-      if let blockedApplication = await MainActor.run(body: {
-        RecordingPrivacyPreferences.frontmostBlockedApplication()
+      if let privacyMatch = await MainActor.run(body: {
+        RecordingPrivacyPreferences.frontmostPrivacyMatch()
       }) {
         guard
           let jpegData = await MainActor.run(body: {
             RecordingPrivacyPlaceholder.jpegData(
               size: CGSize(width: captureSize.width, height: captureSize.height),
               quality: Config.jpegQuality,
-              applicationName: blockedApplication.name
+              applicationName: privacyMatch.placeholderApplicationName
             )
           })
         else {
@@ -372,7 +372,7 @@ final class ScreenRecorder: NSObject, @unchecked Sendable {
           capturedAt: captureTime,
           idleSecondsAtCapture: idleSecondsAtCapture
         )
-        dbg("🔒 Screenshot redacted for blocked foreground application")
+        dbg("Screenshot redacted for privacy rule: \(privacyMatch.ruleType.rawValue)")
         return
       }
 
