@@ -13,7 +13,10 @@ struct SettingsDataTabView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: SettingsStyle.sectionSpacing) {
       exportSection
+      projectTaggingSection
+      standupSection
       reprocessSection
+      repairSection
     }
   }
 
@@ -82,7 +85,7 @@ struct SettingsDataTabView: View {
 
         HStack(spacing: 12) {
           SettingsPrimaryButton(
-            title: viewModel.isExportingTimelineRange ? "Exporting…" : "Export as Markdown",
+            title: viewModel.isExportingTimelineRange ? "Exporting…" : "Export Markdown v2",
             systemImage: viewModel.isExportingTimelineRange ? nil : "square.and.arrow.down",
             isLoading: viewModel.isExportingTimelineRange,
             isDisabled: rangeInvalid,
@@ -103,6 +106,78 @@ struct SettingsDataTabView: View {
         }
 
         if let error = viewModel.exportErrorMessage {
+          Text(error)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.destructive)
+        }
+      }
+    }
+  }
+
+  // MARK: - Project tagging
+
+  private var projectTaggingSection: some View {
+    SettingsSection(
+      title: "Project tagging",
+      subtitle: "Map domains, app names, file names, and card text to project/client tags."
+    ) {
+      VStack(alignment: .leading, spacing: 12) {
+        TextEditor(text: $viewModel.projectRulesText)
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.text)
+          .scrollContentBackground(.hidden)
+          .padding(8)
+          .frame(minHeight: 92, maxHeight: 130)
+          .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .fill(Color.black.opacity(0.025))
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .stroke(SettingsStyle.divider, lineWidth: 1)
+          )
+          .onChange(of: viewModel.projectRulesText) { _, _ in
+            viewModel.markProjectRulesEdited()
+          }
+
+        HStack(spacing: 12) {
+          SettingsSecondaryButton(
+            title: viewModel.isProjectRulesSaved ? "Saved" : "Save rules",
+            isDisabled: viewModel.isProjectRulesSaved,
+            action: viewModel.saveProjectRules
+          )
+
+          Text("Format: Project=keyword,domain,app")
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.meta)
+        }
+      }
+    }
+  }
+
+  // MARK: - Standup composer
+
+  private var standupSection: some View {
+    SettingsSection(
+      title: "Standup composer",
+      subtitle: "Create Slack or Teams-ready Yesterday / Today / Blockers text."
+    ) {
+      VStack(alignment: .leading, spacing: 12) {
+        HStack(spacing: 12) {
+          SettingsPrimaryButton(
+            title: "Copy standup draft",
+            systemImage: "doc.on.clipboard",
+            action: viewModel.copyStandupDraft
+          )
+
+          if let status = viewModel.standupStatusMessage {
+            Text(status)
+              .font(.custom("Figtree", size: 12))
+              .foregroundColor(SettingsStyle.secondary)
+          }
+        }
+
+        if let error = viewModel.standupErrorMessage {
           Text(error)
             .font(.custom("Figtree", size: 12))
             .foregroundColor(SettingsStyle.destructive)
@@ -144,6 +219,7 @@ struct SettingsDataTabView: View {
               withAnimation(.easeOut(duration: 0.2)) {
                 isReprocessDatePickerExpanded = false
               }
+              viewModel.refreshRepairSummary()
             }
           )
           .transition(.move(edge: .top).combined(with: .opacity))
@@ -196,6 +272,127 @@ struct SettingsDataTabView: View {
           "This will delete existing timeline cards for \(dayString) and re-run analysis. It can consume many API calls."
         )
       }
+    }
+  }
+
+  // MARK: - Repair failed batches
+
+  private var repairSection: some View {
+    let normalizedDate = timelineDisplayDate(from: viewModel.reprocessDayDate)
+    let dayString = DateFormatter.yyyyMMdd.string(from: normalizedDate)
+    let summary = viewModel.repairSummary
+    let failedCount = summary?.failedBatchCount ?? 0
+    let retryableCount = summary?.retryableBatchIds.count ?? 0
+    let duplicateCount = summary?.duplicateFailedCardCount ?? 0
+
+    return SettingsSection(
+      title: "Repair failed batches",
+      subtitle: "Clean up duplicate failure cards and retry only failed batches."
+    ) {
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+          Text(dayString)
+            .font(.custom("Figtree", size: 12))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.text)
+
+          SettingsMetadata(
+            text:
+              "\(failedCount) failed • \(retryableCount) retryable • \(duplicateCount) duplicate"
+          )
+
+          Spacer()
+
+          SettingsSecondaryButton(
+            title: viewModel.isRefreshingRepairSummary ? "Refreshing..." : "Refresh",
+            isDisabled: viewModel.isRefreshingRepairSummary,
+            action: viewModel.refreshRepairSummary
+          )
+        }
+
+        if let summary, summary.items.isEmpty {
+          Text("No failed timeline batches found for this day.")
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+        } else if let summary {
+          VStack(alignment: .leading, spacing: 8) {
+            ForEach(summary.items.prefix(6)) { item in
+              failedBatchRow(item)
+            }
+
+            if summary.items.count > 6 {
+              SettingsMetadata(text: "+ \(summary.items.count - 6) more")
+            }
+          }
+        } else {
+          Text("Refresh to inspect failed batches for this day.")
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+        }
+
+        HStack(spacing: 12) {
+          SettingsSecondaryButton(
+            title: viewModel.isDedupingFailedCards ? "Deduping..." : "Dedupe failed cards",
+            isDisabled: viewModel.isDedupingFailedCards || duplicateCount == 0,
+            action: viewModel.dedupeFailedCardsForSelectedDay
+          )
+
+          SettingsPrimaryButton(
+            title: viewModel.isRetryingFailedBatches ? "Retrying..." : "Retry failed batches",
+            systemImage: viewModel.isRetryingFailedBatches ? nil : "arrow.clockwise",
+            isLoading: viewModel.isRetryingFailedBatches,
+            isDisabled: retryableCount == 0,
+            action: { viewModel.showRetryFailedBatchesConfirm = true }
+          )
+        }
+
+        if let status = viewModel.repairStatusMessage {
+          Text(status)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if let error = viewModel.repairErrorMessage {
+          Text(error)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.destructive)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      .alert("Retry failed batches?", isPresented: $viewModel.showRetryFailedBatchesConfirm) {
+        Button("Cancel", role: .cancel) {}
+        Button("Retry", role: .destructive) { viewModel.retryFailedBatchesForSelectedDay() }
+      } message: {
+        Text(
+          "This will re-run \(retryableCount) failed batch\(retryableCount == 1 ? "" : "es") for \(dayString). It may consume API calls."
+        )
+      }
+    }
+  }
+
+  private func failedBatchRow(_ item: FailedBatchRepairItem) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 10) {
+      Text("#\(item.batchId)")
+        .font(.custom("Figtree", size: 12))
+        .fontWeight(.semibold)
+        .foregroundColor(SettingsStyle.text)
+        .frame(width: 72, alignment: .leading)
+
+      Text(item.batchStatus)
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(SettingsStyle.secondary)
+        .frame(width: 82, alignment: .leading)
+
+      Text("\(item.failedCardCount) failed card\(item.failedCardCount == 1 ? "" : "s")")
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(SettingsStyle.secondary)
+
+      Text("\(item.screenshotCount) screenshots")
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(item.isRetryable ? SettingsStyle.statusGood : SettingsStyle.destructive)
+
+      Spacer()
     }
   }
 

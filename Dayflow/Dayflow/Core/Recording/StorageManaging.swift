@@ -78,6 +78,8 @@ protocol StorageManaging: Sendable {
   func resetBatchStatuses(forDay day: String) -> [Int64]  // Returns affected batch IDs
   func resetBatchStatuses(forBatchIds batchIds: [Int64]) -> [Int64]
   func fetchBatches(forDay day: String) -> [(id: Int64, startTs: Int, endTs: Int, status: String)]
+  func failedBatchRepairSummary(forDay day: String) -> FailedBatchRepairSummary
+  func dedupeFailedTimelineCards(forDay day: String) -> Int
 
   /// Chunks that belong to one batch, already sorted.
   func chunksForBatch(_ batchId: Int64) -> [RecordingChunk]

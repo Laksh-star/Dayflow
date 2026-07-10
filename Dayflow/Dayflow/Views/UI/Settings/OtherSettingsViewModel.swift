@@ -38,6 +38,8 @@ final class OtherSettingsViewModel: ObservableObject {
   }
   @Published var outputLanguageOverride: String
   @Published var isOutputLanguageOverrideSaved: Bool = true
+  @Published var projectRulesText: String
+  @Published var isProjectRulesSaved = true
 
   @Published var exportStartDate: Date
   @Published var exportEndDate: Date
@@ -49,6 +51,15 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var reprocessStatusMessage: String?
   @Published var reprocessErrorMessage: String?
   @Published var showReprocessDayConfirm = false
+  @Published var repairSummary: FailedBatchRepairSummary?
+  @Published var isRefreshingRepairSummary = false
+  @Published var isDedupingFailedCards = false
+  @Published var isRetryingFailedBatches = false
+  @Published var repairStatusMessage: String?
+  @Published var repairErrorMessage: String?
+  @Published var showRetryFailedBatchesConfirm = false
+  @Published var standupStatusMessage: String?
+  @Published var standupErrorMessage: String?
 
   init() {
     analyticsEnabled = AnalyticsService.shared.isOptedIn
@@ -58,9 +69,11 @@ final class OtherSettingsViewModel: ObservableObject {
     showDailyGoalPopups = DayGoalPreferences.showDailyGoalPopups
     saveAllTimelapsesToDisk = TimelapsePreferences.saveAllTimelapsesToDisk
     outputLanguageOverride = LLMOutputLanguagePreferences.override
+    projectRulesText = ProjectTaggingService.rulesText
     exportStartDate = timelineDisplayDate(from: Date())
     exportEndDate = timelineDisplayDate(from: Date())
     reprocessDayDate = timelineDisplayDate(from: Date())
+    refreshRepairSummary()
   }
 
   func markOutputLanguageOverrideEdited() {
@@ -80,6 +93,17 @@ final class OtherSettingsViewModel: ObservableObject {
     outputLanguageOverride = ""
     LLMOutputLanguagePreferences.override = ""
     isOutputLanguageOverrideSaved = true
+  }
+
+  func markProjectRulesEdited() {
+    isProjectRulesSaved = projectRulesText.trimmingCharacters(in: .whitespacesAndNewlines)
+      == ProjectTaggingService.rulesText.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  func saveProjectRules() {
+    projectRulesText = projectRulesText.trimmingCharacters(in: .whitespacesAndNewlines)
+    ProjectTaggingService.rulesText = projectRulesText
+    isProjectRulesSaved = true
   }
 
   func refreshAnalyticsState() {
@@ -110,7 +134,7 @@ final class OtherSettingsViewModel: ObservableObject {
       var cursor = start
       let endDate = end
 
-      var sections: [String] = []
+      var cardsByDay: [(day: Date, cards: [TimelineCard])] = []
       var totalActivities = 0
       var dayCount = 0
 
@@ -118,24 +142,28 @@ final class OtherSettingsViewModel: ObservableObject {
         let dayString = dayFormatter.string(from: cursor)
         let cards = StorageManager.shared.fetchTimelineCards(forDay: dayString)
         totalActivities += cards.count
-        let section = TimelineClipboardFormatter.makeMarkdown(for: cursor, cards: cards)
-        sections.append(section)
+        cardsByDay.append((day: cursor, cards: cards))
         dayCount += 1
 
         guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
         cursor = next
       }
 
-      let divider = "\n\n---\n\n"
-      let exportText = sections.joined(separator: divider)
+      let exportText = MarkdownV2RangeExportBuilder.makeMarkdown(
+        start: start,
+        end: end,
+        cardsByDay: cardsByDay
+      )
+      let finalDayCount = dayCount
+      let finalActivityCount = totalActivities
 
       await MainActor.run {
         self.presentSavePanelAndWrite(
           exportText: exportText,
           startDate: start,
           endDate: end,
-          dayCount: dayCount,
-          activityCount: totalActivities
+          dayCount: finalDayCount,
+          activityCount: finalActivityCount
         )
       }
     }
@@ -172,6 +200,112 @@ final class OtherSettingsViewModel: ObservableObject {
           self.isReprocessingDay = false
         }
       })
+  }
+
+  func refreshRepairSummary() {
+    guard !isRefreshingRepairSummary else { return }
+    let dayString = DateFormatter.yyyyMMdd.string(from: timelineDisplayDate(from: reprocessDayDate))
+
+    isRefreshingRepairSummary = true
+    repairErrorMessage = nil
+
+    Task.detached(priority: .userInitiated) { [dayString] in
+      let summary = StorageManager.shared.failedBatchRepairSummary(forDay: dayString)
+      await MainActor.run {
+        self.repairSummary = summary
+        self.isRefreshingRepairSummary = false
+      }
+    }
+  }
+
+  func dedupeFailedCardsForSelectedDay() {
+    guard !isDedupingFailedCards else { return }
+    let dayString = DateFormatter.yyyyMMdd.string(from: timelineDisplayDate(from: reprocessDayDate))
+
+    isDedupingFailedCards = true
+    repairStatusMessage = nil
+    repairErrorMessage = nil
+
+    Task.detached(priority: .userInitiated) { [dayString] in
+      let deletedCount = StorageManager.shared.dedupeFailedTimelineCards(forDay: dayString)
+      let summary = StorageManager.shared.failedBatchRepairSummary(forDay: dayString)
+
+      await MainActor.run {
+        self.repairSummary = summary
+        self.repairStatusMessage =
+          deletedCount == 0
+          ? "No duplicate failed cards found."
+          : "Removed \(deletedCount) duplicate failed card\(deletedCount == 1 ? "" : "s")."
+        self.isDedupingFailedCards = false
+      }
+    }
+  }
+
+  func retryFailedBatchesForSelectedDay() {
+    guard !isRetryingFailedBatches else { return }
+    let dayString = DateFormatter.yyyyMMdd.string(from: timelineDisplayDate(from: reprocessDayDate))
+    let batchIds =
+      repairSummary?.retryableBatchIds
+      ?? StorageManager.shared.failedBatchRepairSummary(forDay: dayString).retryableBatchIds
+
+    guard !batchIds.isEmpty else {
+      repairStatusMessage = nil
+      repairErrorMessage = "No retryable failed batches found for \(dayString)."
+      return
+    }
+
+    isRetryingFailedBatches = true
+    repairErrorMessage = nil
+    repairStatusMessage = "Retrying \(batchIds.count) failed batch\(batchIds.count == 1 ? "" : "es")..."
+
+    AnalysisManager.shared.reprocessSpecificBatches(
+      batchIds,
+      progressHandler: { [weak self] message in
+        Task { @MainActor in
+          self?.repairStatusMessage = message
+        }
+      },
+      completion: { [weak self] result in
+        Task { @MainActor in
+          guard let self else { return }
+          switch result {
+          case .success:
+            let summary = StorageManager.shared.failedBatchRepairSummary(forDay: dayString)
+            self.repairSummary = summary
+            self.repairStatusMessage = "Retry complete. \(summary.failedBatchCount) failed batch\(summary.failedBatchCount == 1 ? "" : "es") remain."
+          case .failure(let error):
+            self.repairErrorMessage = error.localizedDescription
+          }
+          self.isRetryingFailedBatches = false
+        }
+      }
+    )
+  }
+
+  func copyStandupDraft() {
+    standupStatusMessage = nil
+    standupErrorMessage = nil
+
+    let today = timelineDisplayDate(from: Date())
+    guard let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today) else {
+      standupErrorMessage = "Could not calculate yesterday."
+      return
+    }
+
+    let todayString = DateFormatter.yyyyMMdd.string(from: today)
+    let yesterdayString = DateFormatter.yyyyMMdd.string(from: yesterday)
+    let todayCards = StorageManager.shared.fetchTimelineCards(forDay: todayString)
+    let yesterdayCards = StorageManager.shared.fetchTimelineCards(forDay: yesterdayString)
+
+    let text = StandupComposerService.compose(
+      yesterdayCards: yesterdayCards,
+      todayCards: todayCards,
+      projectRules: ProjectTaggingService.rules()
+    )
+
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
+    standupStatusMessage = "Copied standup draft for \(yesterdayString) / \(todayString)."
   }
 
   @MainActor
