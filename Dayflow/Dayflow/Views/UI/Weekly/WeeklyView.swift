@@ -90,7 +90,8 @@ struct WeeklyView: View {
             title: weekRange.title,
             canNavigateForward: weekRange.canNavigateForward,
             onPrevious: showPreviousWeek,
-            onNext: showNextWeek
+            onNext: showNextWeek,
+            onExportMarkdown: exportWeeklyMarkdown
           )
           .padding(.bottom, layout.headerBottomPadding)
 
@@ -377,6 +378,42 @@ struct WeeklyView: View {
       .joined(separator: "-")
 
     return "dayflow-weekly-\(weekSlug)-\(graphicSlug).png"
+  }
+
+  private func exportWeeklyMarkdown() {
+    let range = weekRange
+    let cards = StorageManager.shared.fetchTimelineCardsByTimeRange(
+      from: range.weekStart,
+      to: range.weekEnd
+    )
+    let observations = StorageManager.shared.fetchObservationsByTimeRange(
+      from: range.weekStart,
+      to: range.weekEnd
+    )
+    let markdown = MarkdownExportService.weeklyMarkdown(
+      MarkdownExportService.WeeklyExportInput(
+        range: range,
+        dashboard: dashboardSnapshot,
+        cards: cards,
+        observations: observations,
+        recordedMinutes: selectedWeekRecordedMinutes
+      )
+    )
+    let didSave = MarkdownExportService.saveMarkdown(
+      markdown: markdown,
+      defaultFileName: MarkdownExportService.weeklyFileName(range: range),
+      panelTitle: "Export weekly Markdown"
+    )
+
+    if didSave {
+      AnalyticsService.shared.capture(
+        "weekly_markdown_exported",
+        [
+          "week_start": DateFormatter.yyyyMMdd.string(from: range.weekStart),
+          "cards_count": cards.count,
+          "observations_count": observations.count,
+        ])
+    }
   }
 
   private func showPreviousWeek() {

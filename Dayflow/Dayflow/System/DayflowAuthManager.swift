@@ -254,7 +254,7 @@ struct DayflowAuthActionResult: Equatable {
 final class DayflowAuthManager: ObservableObject {
   static let shared = DayflowAuthManager()
 
-  nonisolated private static let sessionService = "com.teleportlabs.dayflow.auth"
+  nonisolated private static let sessionService = "com.teleportlabs.dayflow.dev.auth"
   nonisolated private static let sessionAccount = "session_token"
   private static let rememberedEmailKey = "dayflowAccountEmail"
   private static let pendingReferralCodeKey = "dayflowPendingReferralCode"

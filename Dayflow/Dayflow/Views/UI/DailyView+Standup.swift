@@ -10,6 +10,7 @@ extension DailyView {
       if hasPersistedStandupEntry {
         standupCopyButton(scale: scale)
       }
+      dailyMarkdownExportButton(scale: scale)
       standupRegenerateButton(scale: scale)
       dailyProviderButton(scale: scale)
     }
@@ -18,6 +19,32 @@ extension DailyView {
       Spacer(minLength: 0)
       actionButtons
     }
+  }
+  func dailyMarkdownExportButton(scale: CGFloat) -> some View {
+    Button(action: exportDailyMarkdown) {
+      HStack(spacing: 6 * scale) {
+        Image(systemName: "square.and.arrow.up")
+          .font(.system(size: 12 * scale, weight: .semibold))
+          .frame(width: 16 * scale, height: 16 * scale)
+
+        Text("Export Markdown")
+          .font(.custom("Figtree-Medium", size: 14 * scale))
+          .lineLimit(1)
+      }
+      .foregroundStyle(Color(hex: "5E4B3E"))
+      .padding(.horizontal, 12 * scale)
+      .padding(.vertical, 10 * scale)
+      .background(Color(hex: "FFF7EF"))
+      .clipShape(Capsule(style: .continuous))
+      .overlay(
+        Capsule(style: .continuous)
+          .stroke(Color(hex: "E8D8C8"), lineWidth: max(1.2, 1.5 * scale))
+      )
+      .contentShape(Capsule(style: .continuous))
+    }
+    .buttonStyle(DailyCopyPressButtonStyle())
+    .pointingHandCursorOnHover(reassertOnPressEnd: true)
+    .accessibilityLabel(Text("Export daily Markdown"))
   }
   func standupCopyButton(scale: CGFloat) -> some View {
     let transition = AnyTransition.opacity.combined(with: .scale(scale: 0.5))
@@ -256,6 +283,37 @@ extension DailyView {
         }
         standupCopyResetTask = nil
       }
+    }
+  }
+  func exportDailyMarkdown() {
+    let day = workflowDayInfo(for: selectedDate)
+    let cards = StorageManager.shared.fetchTimelineCards(forDay: day.dayString)
+    let observations = StorageManager.shared.fetchObservations(
+      startTs: Int(day.startOfDay.timeIntervalSince1970),
+      endTs: Int(day.endOfDay.timeIntervalSince1970)
+    )
+    let markdown = MarkdownExportService.dailyMarkdown(
+      MarkdownExportService.DailyExportInput(
+        day: day,
+        standupDraft: standupDraft,
+        cards: cards,
+        observations: observations
+      )
+    )
+    let didSave = MarkdownExportService.saveMarkdown(
+      markdown: markdown,
+      defaultFileName: MarkdownExportService.dailyFileName(day: day.dayString),
+      panelTitle: "Export daily Markdown"
+    )
+
+    if didSave {
+      AnalyticsService.shared.capture(
+        "daily_markdown_exported",
+        [
+          "timeline_day": day.dayString,
+          "cards_count": cards.count,
+          "observations_count": observations.count,
+        ])
     }
   }
   func regenerateStandupFromTimeline() {

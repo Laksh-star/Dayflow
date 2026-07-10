@@ -37,6 +37,9 @@ final class UpdaterManager: NSObject, ObservableObject {
   @Published var latestVersionString: String? = nil
 
   private let logger = Logger(subsystem: "com.dayflow.app", category: "sparkle")
+  private var isDevBuild: Bool {
+    Bundle.main.bundleIdentifier == "teleportlabs.com.Dayflow.dev"
+  }
 
   private override init() {
     super.init()
@@ -49,6 +52,12 @@ final class UpdaterManager: NSObject, ObservableObject {
     print(
       "[Sparkle] Info SUPublicEDKey = \(Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") ?? "nil")"
     )
+
+    if isDevBuild {
+      statusText = "Updates disabled for Dayflow Dev"
+      print("[Sparkle] disabled for Dayflow Dev build")
+      return
+    }
 
     do {
       try updater.start()
@@ -63,6 +72,12 @@ final class UpdaterManager: NSObject, ObservableObject {
   }
 
   func checkForUpdates(showUI: Bool = false) {
+    guard !isDevBuild else {
+      isChecking = false
+      statusText = "Updates disabled for Dayflow Dev"
+      return
+    }
+
     isChecking = true
     statusText = "Checking…"
     track(
