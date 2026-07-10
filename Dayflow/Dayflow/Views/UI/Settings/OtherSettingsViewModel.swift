@@ -58,8 +58,34 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var repairStatusMessage: String?
   @Published var repairErrorMessage: String?
   @Published var showRetryFailedBatchesConfirm = false
+  @Published var repairProviderOverrideId = "current"
+  @Published var repairModelOverrideText = ""
   @Published var standupStatusMessage: String?
   @Published var standupErrorMessage: String?
+
+  var repairProviderOverrideSupportsModel: Bool {
+    repairProviderOverrideId == OpenAICompatibleProviderSettings.providerID
+      || repairProviderOverrideId == LLMProviderID.gemini.rawValue
+  }
+
+  var repairProviderOverrideLabel: String {
+    switch repairProviderOverrideId {
+    case "current":
+      return "current provider"
+    case OpenAICompatibleProviderSettings.providerID:
+      return "API"
+    case LLMProviderID.gemini.rawValue:
+      return "Gemini"
+    case "chatgpt_codex":
+      return "ChatGPT CLI"
+    case "chatgpt_claude":
+      return "Claude CLI"
+    case LLMProviderID.ollama.rawValue:
+      return "Local"
+    default:
+      return "selected provider"
+    }
+  }
 
   init() {
     analyticsEnabled = AnalyticsService.shared.isOptedIn
@@ -256,10 +282,14 @@ final class OtherSettingsViewModel: ObservableObject {
 
     isRetryingFailedBatches = true
     repairErrorMessage = nil
-    repairStatusMessage = "Retrying \(batchIds.count) failed batch\(batchIds.count == 1 ? "" : "es")..."
+    let override = repairProcessingOverride()
+    let providerLabel = repairProviderOverrideLabel
+    repairStatusMessage =
+      "Retrying \(batchIds.count) failed batch\(batchIds.count == 1 ? "" : "es") with \(providerLabel)..."
 
     AnalysisManager.shared.reprocessSpecificBatches(
       batchIds,
+      override: override,
       progressHandler: { [weak self] message in
         Task { @MainActor in
           self?.repairStatusMessage = message
@@ -280,6 +310,31 @@ final class OtherSettingsViewModel: ObservableObject {
         }
       }
     )
+  }
+
+  private func repairProcessingOverride() -> LLMProcessingOverride? {
+    switch repairProviderOverrideId {
+    case "current":
+      return nil
+    case OpenAICompatibleProviderSettings.providerID:
+      return LLMProcessingOverride(
+        providerID: .openAICompatible,
+        modelID: repairModelOverrideText
+      )
+    case LLMProviderID.gemini.rawValue:
+      return LLMProcessingOverride(
+        providerID: .gemini,
+        modelID: repairModelOverrideText
+      )
+    case "chatgpt_codex":
+      return LLMProcessingOverride(providerID: .chatGPTClaude, chatTool: .codex)
+    case "chatgpt_claude":
+      return LLMProcessingOverride(providerID: .chatGPTClaude, chatTool: .claude)
+    case LLMProviderID.ollama.rawValue:
+      return LLMProcessingOverride(providerID: .ollama)
+    default:
+      return nil
+    }
   }
 
   func copyStandupDraft() {

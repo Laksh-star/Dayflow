@@ -5,6 +5,23 @@
 
 import Foundation
 
+struct LLMProcessingOverride: Equatable, Sendable {
+  let providerID: LLMProviderID
+  let modelID: String?
+  let chatTool: ChatCLITool?
+
+  init(providerID: LLMProviderID, modelID: String? = nil, chatTool: ChatCLITool? = nil) {
+    self.providerID = providerID
+    self.modelID = modelID?.trimmingCharacters(in: .whitespacesAndNewlines)
+    self.chatTool = chatTool
+  }
+
+  var sanitizedModelID: String? {
+    guard let modelID, !modelID.isEmpty else { return nil }
+    return modelID
+  }
+}
+
 struct ActivityGenerationContext {
   let batchObservations: [Observation]
   let existingCards: [ActivityCardData]  // Cards that overlap with current analysis window
@@ -182,7 +199,7 @@ enum LLMProviderType: Codable {
   }
 }
 
-enum LLMProviderID: String, Codable, CaseIterable {
+enum LLMProviderID: String, Codable, CaseIterable, Sendable {
   case gemini
   case dayflow
   case ollama

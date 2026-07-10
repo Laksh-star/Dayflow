@@ -330,6 +330,54 @@ struct SettingsDataTabView: View {
             .foregroundColor(SettingsStyle.secondary)
         }
 
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Retry provider")
+            .font(.custom("Figtree", size: 11))
+            .fontWeight(.semibold)
+            .textCase(.uppercase)
+            .foregroundColor(SettingsStyle.meta)
+
+          HStack(spacing: 10) {
+            Picker("Retry provider", selection: $viewModel.repairProviderOverrideId) {
+              Text("Current provider").tag("current")
+              Text("API").tag(OpenAICompatibleProviderSettings.providerID)
+              Text("Gemini").tag(LLMProviderID.gemini.rawValue)
+              Text("ChatGPT CLI").tag("chatgpt_codex")
+              Text("Claude CLI").tag("chatgpt_claude")
+              Text("Local").tag(LLMProviderID.ollama.rawValue)
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(width: 180, alignment: .leading)
+            .disabled(viewModel.isRetryingFailedBatches)
+
+            if viewModel.repairProviderOverrideSupportsModel {
+              TextField("Model override", text: $viewModel.repairModelOverrideText)
+                .font(.custom("Figtree", size: 12))
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                  RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.black.opacity(0.025))
+                )
+                .overlay(
+                  RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(SettingsStyle.divider, lineWidth: 1)
+                )
+                .frame(width: 260)
+                .disabled(viewModel.isRetryingFailedBatches)
+            }
+          }
+
+          Text(
+            "Only repair retries use this override. Leave the model blank to use the saved provider default."
+          )
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.meta)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+
         HStack(spacing: 12) {
           SettingsSecondaryButton(
             title: viewModel.isDedupingFailedCards ? "Deduping..." : "Dedupe failed cards",

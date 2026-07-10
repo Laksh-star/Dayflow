@@ -23,6 +23,10 @@ protocol LLMServicing {
   func processBatch(
     _ batchId: Int64, progressHandler: ((LLMProcessingStep) -> Void)?,
     completion: @escaping (Result<ProcessedBatchResult, Error>) -> Void)
+  func processBatch(
+    _ batchId: Int64, override: LLMProcessingOverride?,
+    progressHandler: ((LLMProcessingStep) -> Void)?,
+    completion: @escaping (Result<ProcessedBatchResult, Error>) -> Void)
   func generateText(prompt: String) async throws -> String
   func generateTextStreaming(prompt: String) -> AsyncThrowingStream<String, Error>
   /// Rich chat streaming with thinking, tool calls, and text events.
@@ -71,9 +75,13 @@ final class LLMService: LLMServicing {
     LLMProviderType.load()
   }
 
-  private func makeGeminiProvider() -> GeminiDirectProvider? {
+  private func makeGeminiProvider(modelIDOverride: String? = nil) -> GeminiDirectProvider? {
     if let apiKey = KeychainManager.shared.retrieve(for: "gemini"), !apiKey.isEmpty {
-      let preference = GeminiModelPreference.load()
+      let preference =
+        modelIDOverride
+        .flatMap(GeminiModel.init(rawValue:))
+        .map { GeminiModelPreference(primary: $0) }
+        ?? GeminiModelPreference.load()
       return GeminiDirectProvider(apiKey: apiKey, preference: preference)
     } else {
       print("❌ [LLMService] Failed to retrieve Gemini API key from Keychain")
@@ -110,8 +118,12 @@ final class LLMService: LLMServicing {
     OllamaProvider(endpoint: endpoint)
   }
 
-  private func makeOpenAICompatibleProvider(endpoint: String) -> OllamaProvider? {
-    let modelId = OpenAICompatibleProviderSettings.loadModelID()
+  private func makeOpenAICompatibleProvider(endpoint: String, modelIDOverride: String? = nil)
+    -> OllamaProvider?
+  {
+    let modelOverride = modelIDOverride?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let modelId =
+      modelOverride.isEmpty ? OpenAICompatibleProviderSettings.loadModelID() : modelOverride
     let apiKey = OpenAICompatibleProviderSettings.loadAPIKey()
     guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       print("❌ [LLMService] OpenAI-compatible provider unavailable: missing API key")
@@ -166,11 +178,14 @@ final class LLMService: LLMServicing {
 
   private func makeBatchProvider(
     for providerID: LLMProviderID,
-    chatToolOverride: ChatCLITool? = nil
+    chatToolOverride: ChatCLITool? = nil,
+    modelIDOverride: String? = nil
   ) throws -> (actions: BatchProviderActions, fallbackState: GemmaFallbackState?) {
     switch providerID {
     case .gemini:
-      guard let provider = makeGeminiProvider() else { throw noProviderError() }
+      guard let provider = makeGeminiProvider(modelIDOverride: modelIDOverride) else {
+        throw noProviderError()
+      }
       let gemmaProvider = makeGemmaBackupProvider()
       let fallbackState = GemmaFallbackState()
 
@@ -243,7 +258,12 @@ final class LLMService: LLMServicing {
       )
     case .openAICompatible:
       let endpoint = OpenAICompatibleProviderSettings.loadBaseURL()
-      guard let provider = makeOpenAICompatibleProvider(endpoint: endpoint) else {
+      guard
+        let provider = makeOpenAICompatibleProvider(
+          endpoint: endpoint,
+          modelIDOverride: modelIDOverride
+        )
+      else {
         throw noProviderError()
       }
       return (
@@ -265,9 +285,14 @@ final class LLMService: LLMServicing {
 
   private func makeTimelineProviderContext(
     for providerID: LLMProviderID,
-    chatToolOverride: ChatCLITool? = nil
+    chatToolOverride: ChatCLITool? = nil,
+    modelIDOverride: String? = nil
   ) throws -> TimelineProviderContext {
-    let providerBundle = try makeBatchProvider(for: providerID, chatToolOverride: chatToolOverride)
+    let providerBundle = try makeBatchProvider(
+      for: providerID,
+      chatToolOverride: chatToolOverride,
+      modelIDOverride: modelIDOverride
+    )
     return TimelineProviderContext(
       id: providerID,
       providerLabel: providerLabel(for: providerID, chatToolOverride: chatToolOverride),
@@ -590,6 +615,15 @@ final class LLMService: LLMServicing {
     _ batchId: Int64, progressHandler: ((LLMProcessingStep) -> Void)? = nil,
     completion: @escaping (Result<ProcessedBatchResult, Error>) -> Void
   ) {
+    processBatch(batchId, override: nil, progressHandler: progressHandler, completion: completion)
+  }
+
+  func processBatch(
+    _ batchId: Int64,
+    override: LLMProcessingOverride?,
+    progressHandler: ((LLMProcessingStep) -> Void)? = nil,
+    completion: @escaping (Result<ProcessedBatchResult, Error>) -> Void
+  ) {
     Task {
       // Get batch info first (outside do-catch so it's available in catch block)
       let batches = StorageManager.shared.allBatches()
@@ -604,9 +638,15 @@ final class LLMService: LLMServicing {
 
       let (_, batchStartTs, batchEndTs, _) = batchInfo
       let processingStartTime = Date()
-      let primaryProviderID = LLMProviderID.from(providerType)
-      let primaryProviderLabel = providerLabel(for: primaryProviderID)
-      let configuredBackup = configuredBackupProvider(primaryProviderID: primaryProviderID)
+      let primaryProviderID = override?.providerID ?? LLMProviderID.from(providerType)
+      let primaryChatToolOverride = override?.chatTool
+      let primaryModelOverride = override?.sanitizedModelID
+      let primaryProviderLabel = providerLabel(
+        for: primaryProviderID,
+        chatToolOverride: primaryChatToolOverride
+      )
+      let configuredBackup =
+        override == nil ? configuredBackupProvider(primaryProviderID: primaryProviderID) : nil
       let configuredBackupProviderName = configuredBackup?.id.analyticsName
       let configuredBackupProviderLabel = configuredBackup.map {
         providerLabel(for: $0.id, chatToolOverride: $0.chatToolOverride)
@@ -615,7 +655,8 @@ final class LLMService: LLMServicing {
       var lastProcessingStep: LLMProcessingStep?
       print(
         "🧭 [LLMService] processBatch selected primary=\(primaryProviderID.analyticsName) "
-          + "label=\(primaryProviderLabel) backup=\(configuredBackup?.id.analyticsName ?? "none")"
+          + "label=\(primaryProviderLabel) backup=\(configuredBackup?.id.analyticsName ?? "none") "
+          + "override=\(override == nil ? "false" : "true")"
       )
 
       do {
@@ -632,9 +673,15 @@ final class LLMService: LLMServicing {
             "total_duration_seconds": batchEndTs - batchStartTs,
             "llm_provider": primaryProviderID.analyticsName,
             "llm_provider_label": primaryProviderLabel,
+            "llm_override": override != nil,
+            "llm_model_override": primaryModelOverride as Any,
           ])
 
-        let primaryContext = try makeTimelineProviderContext(for: primaryProviderID)
+        let primaryContext = try makeTimelineProviderContext(
+          for: primaryProviderID,
+          chatToolOverride: primaryChatToolOverride,
+          modelIDOverride: primaryModelOverride
+        )
         let backupContext: TimelineProviderContext? = {
           guard let configuredBackup else { return nil }
           return try? makeTimelineProviderContext(
@@ -849,6 +896,8 @@ final class LLMService: LLMServicing {
             "processing_duration_seconds": Int(Date().timeIntervalSince(processingStartTime)),
             "llm_provider": primaryProviderID.analyticsName,
             "llm_provider_label": primaryProviderLabel,
+            "llm_override": override != nil,
+            "llm_model_override": primaryModelOverride as Any,
             "effective_llm_provider": activeContext.id.analyticsName,
             "used_provider_backup": usedProviderBackup,
           ])
@@ -873,6 +922,8 @@ final class LLMService: LLMServicing {
             "processing_duration_seconds": Int(Date().timeIntervalSince(processingStartTime)),
             "llm_provider": primaryProviderID.analyticsName,
             "llm_provider_label": primaryProviderLabel,
+            "llm_override": override != nil,
+            "llm_model_override": primaryModelOverride as Any,
             "backup_provider": configuredBackupProviderName as Any,
             "backup_provider_label": configuredBackupProviderLabel as Any,
             "backup_configured": backupConfigured,
