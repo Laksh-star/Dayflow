@@ -24,10 +24,12 @@ This file tracks the local development work added on top of the upstream
 - The CLI unit test path is working and currently covers provider settings, weekly dashboard logic, time parsing, privacy matching, and project-rule suggestions.
 - The paid/public app can remain uninstalled or unused while this fork is the active local Dayflow build.
 - New Settings areas now cover export, reprocess/repair, privacy rules, provider routing/API configuration, and project tagging.
+- First focused upstream PR is open as a draft: [JerryZLiu/Dayflow#319](https://github.com/JerryZLiu/Dayflow/pull/319) for Markdown export v2.
 
 ## Recent Commit Ledger
 
 - `HEAD` - Remove the duplicate Settings standup composer and keep Daily as the canonical standup workflow.
+- `9f106b6` - Add Markdown export v2 on the clean upstream PR branch `agent/markdown-export-v2-pr`.
 - `8eb9829` - Update fork project report.
 - `29be612` - Add privacy diagnostics, privacy presets, improved domain matching, project rollups, and suggested project mappings.
 - `bb582fb` - Generalize API provider settings with profiles, auth modes, and token-parameter controls.
@@ -100,7 +102,7 @@ These should probably stay local or be heavily reshaped before an upstream PR:
 
 Good candidates for focused upstream pull requests:
 
-- Markdown export improvements.
+- Markdown export improvements. Draft PR opened: [#319](https://github.com/JerryZLiu/Dayflow/pull/319).
 - OpenAI-compatible API provider, if generalized and documented.
 - Privacy exclusion UI and capture rules.
 - Failed-batch repair controls.
@@ -108,11 +110,21 @@ Good candidates for focused upstream pull requests:
 
 Recommended upstream order:
 
-1. Markdown export v2.
+1. Markdown export v2. Draft opened as [#319](https://github.com/JerryZLiu/Dayflow/pull/319).
 2. OpenAI-compatible API provider.
 3. Privacy exclusion rules.
 4. Failed-batch repair controls.
 5. Project tagging.
+
+## Repository Layout Notes
+
+- The nested `Dayflow/Dayflow/` layout is expected for this upstream Xcode project: the repository root contains docs, scripts, and top-level test folders; the first `Dayflow/` folder contains the Xcode project and app targets; the second `Dayflow/Dayflow/` folder contains the app source.
+- Important source paths:
+  - `Dayflow/Dayflow.xcodeproj` - Xcode project.
+  - `Dayflow/Dayflow/` - app source, assets, views, core services, system utilities.
+  - `Dayflow/DayflowTests/` and `Dayflow/DayflowUITests/` - Xcode test targets.
+  - top-level `DayflowTests/` - an additional upstream test folder.
+- Local/generated folders such as `DerivedData/` and files such as `.DS_Store` are not source organization and should stay out of commits.
 
 ## Known Gaps
 
@@ -131,7 +143,7 @@ Recommended upstream order:
 3. Add screenshot/redaction thumbnail preview for privacy rules.
 4. Improve project tagging edits so suggestions can merge into existing project rows instead of always appending new rules.
 5. Start Git/repo context enrichment for project inference.
-6. Prepare a clean upstream Markdown export branch if we decide to open the first PR.
+6. Monitor draft PR [#319](https://github.com/JerryZLiu/Dayflow/pull/319), respond to maintainer feedback, and make it ready for review once the scope looks acceptable.
 
 ## Verification Notes
 
