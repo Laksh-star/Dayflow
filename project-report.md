@@ -16,19 +16,20 @@ This file tracks the local development work added on top of the upstream
 - Dev bundle ID: `teleportlabs.com.Dayflow.dev`
 - Dev data directory: `~/Library/Application Support/DayflowDev/`
 - Fork remote: `https://github.com/Laksh-star/Dayflow.git`
-- Latest pushed commit: current branch HEAD, `Remove duplicate settings standup composer`
+- Latest pushed commit: current branch HEAD, `Add privacy diagnostics and Toggl export`
 
 ## Current Status
 
 - The dev fork is buildable and has a working shared Xcode scheme.
 - The CLI unit test path is working and currently covers provider settings, weekly dashboard logic, time parsing, privacy matching, and project-rule suggestions.
 - The paid/public app can remain uninstalled or unused while this fork is the active local Dayflow build.
-- New Settings areas now cover export, reprocess/repair, privacy rules, provider routing/API configuration, and project tagging.
+- New Settings areas now cover export, Toggl draft export, reprocess/repair, privacy rules, provider routing/API configuration, and project tagging.
 - First focused upstream PR is open as a draft: [JerryZLiu/Dayflow#319](https://github.com/JerryZLiu/Dayflow/pull/319) for Markdown export v2.
 
 ## Recent Commit Ledger
 
-- `HEAD` - Remove the duplicate Settings standup composer and keep Daily as the canonical standup workflow.
+- `HEAD` - Add privacy v3 diagnostics and Toggl API draft export.
+- `44762e3` - Remove the duplicate Settings standup composer and keep Daily as the canonical standup workflow.
 - `9f106b6` - Add Markdown export v2 on the clean upstream PR branch `agent/markdown-export-v2-pr`.
 - `8eb9829` - Update fork project report.
 - `29be612` - Add privacy diagnostics, privacy presets, improved domain matching, project rollups, and suggested project mappings.
@@ -72,8 +73,21 @@ This file tracks the local development work added on top of the upstream
 - Added domain and window-title sensitive rules for capture blocking.
 - Added current-window preview status so the user can see whether recording is allowed.
 - Added v2 diagnostics that explain whether the current screenshot would be captured or hidden and why.
+- Added v3 diagnostic rows for blocked-app, domain, and window-title checks so the user can see each rule family matching or clearing the current window.
 - Added rule presets for Gmail, WhatsApp, banking, and password managers.
 - Improved browser-domain matching by extracting URL/domain candidates from window titles.
+
+### Toggl API export
+
+- Added a local Toggl export flow in Settings > Export.
+- Stores the Toggl API token in the Dayflow Dev keychain namespace under the `toggl` provider key.
+- Stores the Toggl workspace ID in UserDefaults.
+- Loads workspace projects from `GET /api/v9/workspaces/{workspace_id}/projects` using Toggl Basic auth with `api_token`.
+- Prepares editable draft time entries from the selected Dayflow export date range.
+- Draft rows are generated from timeline cards and use Dayflow project-tagging rules as the first-pass source project.
+- Draft rows let the user include/exclude entries, edit the Toggl description, and select a real Toggl project before submitting.
+- Submits selected rows through `POST /api/v9/workspaces/{workspace_id}/time_entries`.
+- Important UI note: Dayflow "Project tagging" is local mapping (`Project=keyword,domain,app`) and is not the same thing as Toggl projects. The next UI cleanup should rename that section to "Dayflow project tagging" and make the Toggl project picker more visibly separate.
 
 ### Reprocess and repair controls
 
@@ -107,6 +121,7 @@ Good candidates for focused upstream pull requests:
 - Privacy exclusion UI and capture rules.
 - Failed-batch repair controls.
 - Project tagging, if framed as an optional productivity tool.
+- Toggl export, likely only after the UI language is cleaned up and the integration is documented.
 
 Recommended upstream order:
 
@@ -115,6 +130,7 @@ Recommended upstream order:
 3. Privacy exclusion rules.
 4. Failed-batch repair controls.
 5. Project tagging.
+6. Toggl export.
 
 ## Repository Layout Notes
 
@@ -125,6 +141,9 @@ Recommended upstream order:
   - `Dayflow/DayflowTests/` and `Dayflow/DayflowUITests/` - Xcode test targets.
   - top-level `DayflowTests/` - an additional upstream test folder.
 - Local/generated folders such as `DerivedData/` and files such as `.DS_Store` are not source organization and should stay out of commits.
+- Use separate build output folders to avoid dev/public identity confusion:
+  - `DerivedDataDev/` for the local dev fork.
+  - `DerivedDataPR/` for clean upstream PR builds.
 
 ## Known Gaps
 
@@ -135,22 +154,27 @@ Recommended upstream order:
 - Privacy preview is app/window oriented; it does not yet show screenshot redaction thumbnails.
 - Project tagging is rules-based and lightweight; it does not yet infer repo paths or Git metadata.
 - Suggested project mappings currently append simple `Project=pattern` rules and do not edit existing project rows in place.
+- Toggl export has no duplicate-detection against existing Toggl entries yet; the user must review before submitting.
+- Toggl export currently maps Dayflow projects to Toggl projects by name similarity and then relies on user review/editing.
+- Toggl UI labels need cleanup because local Dayflow project tags and real Toggl workspace projects are easy to confuse.
 
 ## Next Priorities
 
 1. Run Dayflow Dev for another real work session and validate cards, privacy blocking, repair retries, exports, and project rollups against actual usage.
 2. Add API provider v2 support for arbitrary extra headers and provider-specific request metadata.
-3. Add screenshot/redaction thumbnail preview for privacy rules.
-4. Improve project tagging edits so suggestions can merge into existing project rows instead of always appending new rules.
-5. Start Git/repo context enrichment for project inference.
-6. Monitor draft PR [#319](https://github.com/JerryZLiu/Dayflow/pull/319), respond to maintainer feedback, and make it ready for review once the scope looks acceptable.
+3. Clean up Settings > Export wording so Dayflow project tags and Toggl projects are visually distinct.
+4. Add screenshot/redaction thumbnail preview for privacy rules.
+5. Improve project tagging edits so suggestions can merge into existing project rows instead of always appending new rules.
+6. Start Git/repo context enrichment for project inference.
+7. Add Toggl duplicate detection and richer project/task mapping before broader use.
+8. Monitor draft PR [#319](https://github.com/JerryZLiu/Dayflow/pull/319), respond to maintainer feedback, and make it ready for review once the scope looks acceptable.
 
 ## Verification Notes
 
 - Use Xcode or `xcodebuild` with the dev signing team selected.
 - CLI build check:
-  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dayflow/Dayflow.xcodeproj -scheme Dayflow -configuration Debug -derivedDataPath DerivedData build`
+  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project Dayflow/Dayflow.xcodeproj -scheme Dayflow -configuration Debug -derivedDataPath DerivedDataDev build`
 - CLI unit test check:
-  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Dayflow/Dayflow.xcodeproj -scheme Dayflow -destination 'platform=macOS' -derivedDataPath DerivedData`
-- Keep `DerivedData/` and `Dayflow/Config/LocalSecrets.xcconfig` out of commits.
+  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project Dayflow/Dayflow.xcodeproj -scheme Dayflow -destination 'platform=macOS' -derivedDataPath DerivedDataDev`
+- Keep `DerivedData/`, `DerivedDataDev/`, `DerivedDataPR/`, and `Dayflow/Config/LocalSecrets.xcconfig` out of commits.
 - After provider or signing changes, restart Dayflow Dev so macOS permission identity and runtime settings are cleanly reloaded.
