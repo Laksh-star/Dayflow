@@ -45,6 +45,30 @@ struct RecordingPrivacyMatch: Equatable, Sendable {
   }
 }
 
+struct RecordingPrivacyRuleDiagnostic: Identifiable, Equatable, Sendable {
+  enum Status: String, Sendable {
+    case matched
+    case clear
+  }
+
+  let id: String
+  let label: String
+  let value: String
+  let status: Status
+  let detail: String
+
+  var didMatch: Bool { status == .matched }
+}
+
+struct RecordingPrivacyDiagnostic: Equatable, Sendable {
+  let context: RecordingPrivacyContext
+  let match: RecordingPrivacyMatch?
+  let extractedDomains: [String]
+  let checks: [RecordingPrivacyRuleDiagnostic]
+
+  var allowsCapture: Bool { match == nil }
+}
+
 enum RecordingPrivacyPreset: String, CaseIterable, Identifiable, Sendable {
   case gmail
   case whatsApp
@@ -325,11 +349,121 @@ enum RecordingPrivacyPreferences {
     return nil
   }
 
+  static func privacyDiagnostic(
+    for context: RecordingPrivacyContext,
+    defaults: UserDefaults = .standard
+  ) -> RecordingPrivacyDiagnostic {
+    let match = privacyMatch(for: context, defaults: defaults)
+    let windowTitle = normalizedSearchText(context.windowTitle) ?? ""
+    let extractedDomains = domainCandidates(in: windowTitle)
+    var checks: [RecordingPrivacyRuleDiagnostic] = []
+
+    let blockedApps = blockedApplicationIdentifiers(defaults: defaults)
+    if blockedApps.isEmpty {
+      checks.append(
+        RecordingPrivacyRuleDiagnostic(
+          id: "application-empty",
+          label: "Blocked apps",
+          value: "No app rules",
+          status: .clear,
+          detail: "No blocked app rule is configured."
+        )
+      )
+    } else {
+      let candidates = [
+        normalizedIdentifier(context.bundleIdentifier),
+        normalizedIdentifier(context.applicationName),
+      ].compactMap { $0 }
+      let matchedApp = blockedApps.first { blocked in
+        candidates.contains(blocked)
+      }
+      checks.append(
+        RecordingPrivacyRuleDiagnostic(
+          id: "application",
+          label: "Blocked apps",
+          value: matchedApp ?? "\(blockedApps.count) app rule\(blockedApps.count == 1 ? "" : "s")",
+          status: matchedApp == nil ? .clear : .matched,
+          detail: matchedApp == nil
+            ? "Frontmost app did not match a blocked app identifier."
+            : "Frontmost app matched \(matchedApp ?? "")."
+        )
+      )
+    }
+
+    let domainRules = blockedDomains(defaults: defaults)
+    if domainRules.isEmpty {
+      checks.append(
+        RecordingPrivacyRuleDiagnostic(
+          id: "domain-empty",
+          label: "Domains",
+          value: "No domain rules",
+          status: .clear,
+          detail: "No sensitive domain rule is configured."
+        )
+      )
+    } else {
+      let matchedDomain = domainRules.first { rule in
+        domainRuleMatches(rule: rule, text: windowTitle, domainCandidates: extractedDomains)
+      }
+      checks.append(
+        RecordingPrivacyRuleDiagnostic(
+          id: "domain",
+          label: "Domains",
+          value: matchedDomain ?? "\(domainRules.count) domain rule\(domainRules.count == 1 ? "" : "s")",
+          status: matchedDomain == nil ? .clear : .matched,
+          detail: matchedDomain == nil
+            ? domainDiagnosticDetail(extractedDomains: extractedDomains)
+            : "Window title or detected URL matched \(matchedDomain ?? "")."
+        )
+      )
+    }
+
+    let titleRules = blockedWindowTitleKeywords(defaults: defaults)
+    if titleRules.isEmpty {
+      checks.append(
+        RecordingPrivacyRuleDiagnostic(
+          id: "title-empty",
+          label: "Window title",
+          value: "No title rules",
+          status: .clear,
+          detail: "No sensitive window-title keyword is configured."
+        )
+      )
+    } else {
+      let matchedKeyword = titleRules.first { windowTitle.localizedCaseInsensitiveContains($0) }
+      checks.append(
+        RecordingPrivacyRuleDiagnostic(
+          id: "window-title",
+          label: "Window title",
+          value: matchedKeyword ?? "\(titleRules.count) keyword rule\(titleRules.count == 1 ? "" : "s")",
+          status: matchedKeyword == nil ? .clear : .matched,
+          detail: matchedKeyword == nil
+            ? "Window title did not contain a sensitive keyword."
+            : "Window title contained \(matchedKeyword ?? "")."
+        )
+      )
+    }
+
+    return RecordingPrivacyDiagnostic(
+      context: context,
+      match: match,
+      extractedDomains: extractedDomains,
+      checks: checks
+    )
+  }
+
   @MainActor
   static func frontmostPrivacyMatch(
     defaults: UserDefaults = .standard
   ) -> RecordingPrivacyMatch? {
     privacyMatch(for: frontmostContext(), defaults: defaults)
+  }
+
+  @MainActor
+  static func frontmostPrivacyDiagnostic(
+    defaults: UserDefaults = .standard
+  ) -> RecordingPrivacyDiagnostic {
+    privacyDiagnostic(for: frontmostContext(), defaults: defaults)
   }
 
   @MainActor
@@ -550,6 +684,13 @@ enum RecordingPrivacyPreferences {
       guard !domain.isEmpty else { return nil }
       return seen.insert(domain).inserted ? domain : nil
     }
+  }
+
+  private static func domainDiagnosticDetail(extractedDomains: [String]) -> String {
+    if extractedDomains.isEmpty {
+      return "No URL-like domain was detected in the window title."
+    }
+    return "Detected \(extractedDomains.joined(separator: ", ")); none matched sensitive domains."
   }
 
   @MainActor

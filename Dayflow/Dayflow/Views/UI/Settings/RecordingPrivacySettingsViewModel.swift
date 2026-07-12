@@ -15,6 +15,12 @@ final class RecordingPrivacySettingsViewModel: ObservableObject {
     windowTitle: nil
   )
   @Published private(set) var previewMatch: RecordingPrivacyMatch?
+  @Published private(set) var previewDiagnostic = RecordingPrivacyDiagnostic(
+    context: RecordingPrivacyContext(applicationName: nil, bundleIdentifier: nil, windowTitle: nil),
+    match: nil,
+    extractedDomains: [],
+    checks: []
+  )
 
   var previewDecisionTitle: String {
     previewMatch == nil ? "This screenshot would be captured" : "This screenshot would be hidden"
@@ -151,9 +157,10 @@ final class RecordingPrivacySettingsViewModel: ObservableObject {
   }
 
   func refreshPreview() {
-    let context = RecordingPrivacyPreferences.frontmostContext()
-    previewContext = context
-    previewMatch = RecordingPrivacyPreferences.privacyMatch(for: context)
+    let diagnostic = RecordingPrivacyPreferences.frontmostPrivacyDiagnostic()
+    previewDiagnostic = diagnostic
+    previewContext = diagnostic.context
+    previewMatch = diagnostic.match
   }
 
   func handleApplicationDrop(providers: [NSItemProvider]) -> Bool {

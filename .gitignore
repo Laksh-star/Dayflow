@@ -9,6 +9,8 @@ Dayflow/eval/
 evals/
 build/
 DerivedData/
+DerivedDataDev/
+DerivedDataPR/
 build_tmp/
 build_universal/
 .claude/

@@ -90,6 +90,20 @@ struct SettingsRecordingPrivacyTabView: View {
         if let match = viewModel.previewMatch {
           privacyPreviewLine("Matched", value: "\(match.ruleType.rawValue): \(match.matchedValue)")
         }
+
+        if !viewModel.previewDiagnostic.extractedDomains.isEmpty {
+          privacyPreviewLine(
+            "Domains",
+            value: viewModel.previewDiagnostic.extractedDomains.joined(separator: ", ")
+          )
+        }
+
+        VStack(alignment: .leading, spacing: 6) {
+          ForEach(viewModel.previewDiagnostic.checks) { check in
+            privacyDiagnosticRow(check)
+          }
+        }
+        .padding(.top, 4)
       }
       .padding(12)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -101,6 +115,33 @@ struct SettingsRecordingPrivacyTabView: View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
           .stroke(SettingsStyle.divider, lineWidth: 1)
       )
+    }
+  }
+
+  private func privacyDiagnosticRow(_ check: RecordingPrivacyRuleDiagnostic) -> some View {
+    HStack(alignment: .top, spacing: 8) {
+      Circle()
+        .fill(check.didMatch ? SettingsStyle.destructive : SettingsStyle.statusGood)
+        .frame(width: 7, height: 7)
+        .padding(.top, 5)
+
+      VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text(check.label)
+            .font(.custom("Figtree", size: 12))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.text)
+          Text(check.didMatch ? "matched" : "clear")
+            .font(.custom("Figtree", size: 11))
+            .fontWeight(.semibold)
+            .foregroundColor(check.didMatch ? SettingsStyle.destructive : SettingsStyle.statusGood)
+        }
+
+        Text("\(check.value) - \(check.detail)")
+          .font(.custom("Figtree", size: 11))
+          .foregroundColor(SettingsStyle.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
     }
   }
 

@@ -43,6 +43,17 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var projectRollups: [ProjectTimeRollup] = []
   @Published var projectRuleSuggestions: [ProjectRuleSuggestion] = []
   @Published var projectRollupStatusMessage: String?
+  @Published var togglAPITokenText: String
+  @Published var togglWorkspaceIDText: String
+  @Published var togglProjects: [TogglProject] = []
+  @Published var togglDraftEntries: [TogglExportDraftEntry] = []
+  @Published var isTogglSettingsSaved = true
+  @Published var isLoadingTogglProjects = false
+  @Published var isPreparingTogglDraft = false
+  @Published var isSubmittingTogglEntries = false
+  @Published var togglStatusMessage: String?
+  @Published var togglErrorMessage: String?
+  @Published var showSubmitTogglConfirm = false
 
   @Published var exportStartDate: Date
   @Published var exportEndDate: Date
@@ -97,6 +108,8 @@ final class OtherSettingsViewModel: ObservableObject {
     saveAllTimelapsesToDisk = TimelapsePreferences.saveAllTimelapsesToDisk
     outputLanguageOverride = LLMOutputLanguagePreferences.override
     projectRulesText = ProjectTaggingService.rulesText
+    togglAPITokenText = TogglExportSettings.loadAPIToken()
+    togglWorkspaceIDText = TogglExportSettings.workspaceID
     exportStartDate = timelineDisplayDate(from: Date())
     exportEndDate = timelineDisplayDate(from: Date())
     reprocessDayDate = timelineDisplayDate(from: Date())
@@ -161,6 +174,152 @@ final class OtherSettingsViewModel: ObservableObject {
     markProjectRulesEdited()
   }
 
+  func markTogglSettingsEdited() {
+    isTogglSettingsSaved =
+      togglAPITokenText.trimmingCharacters(in: .whitespacesAndNewlines)
+      == TogglExportSettings.loadAPIToken().trimmingCharacters(in: .whitespacesAndNewlines)
+      && togglWorkspaceIDText.trimmingCharacters(in: .whitespacesAndNewlines)
+        == TogglExportSettings.workspaceID.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  func saveTogglSettings() {
+    togglAPITokenText = togglAPITokenText.trimmingCharacters(in: .whitespacesAndNewlines)
+    togglWorkspaceIDText = togglWorkspaceIDText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let tokenSaved = TogglExportSettings.saveAPIToken(togglAPITokenText)
+    TogglExportSettings.workspaceID = togglWorkspaceIDText
+    isTogglSettingsSaved = tokenSaved
+    togglErrorMessage = tokenSaved ? nil : "Couldn't save Toggl API token to Keychain."
+    if tokenSaved {
+      togglStatusMessage = "Toggl settings saved."
+    }
+  }
+
+  func loadTogglProjects() {
+    guard !isLoadingTogglProjects else { return }
+    let token = currentTogglToken()
+    let workspaceID = togglWorkspaceIDText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    guard !token.isEmpty else {
+      togglErrorMessage = "Add and save a Toggl API token first."
+      return
+    }
+    guard !workspaceID.isEmpty else {
+      togglErrorMessage = "Add a Toggl workspace ID first."
+      return
+    }
+
+    isLoadingTogglProjects = true
+    togglStatusMessage = nil
+    togglErrorMessage = nil
+
+    Task {
+      do {
+        let projects = try await TogglExportService.fetchProjects(
+          apiToken: token,
+          workspaceID: workspaceID
+        )
+        togglProjects = projects
+        togglStatusMessage = "Loaded \(projects.count) Toggl project\(projects.count == 1 ? "" : "s")."
+        if !togglDraftEntries.isEmpty {
+          prepareTogglDraft()
+        }
+      } catch {
+        togglErrorMessage = error.localizedDescription
+      }
+      isLoadingTogglProjects = false
+    }
+  }
+
+  func prepareTogglDraft() {
+    guard !isPreparingTogglDraft else { return }
+    let start = timelineDisplayDate(from: exportStartDate)
+    let end = timelineDisplayDate(from: exportEndDate)
+
+    guard start <= end else {
+      togglErrorMessage = "Start date must be on or before end date."
+      return
+    }
+
+    isPreparingTogglDraft = true
+    togglStatusMessage = nil
+    togglErrorMessage = nil
+
+    Task.detached(priority: .userInitiated) { [start, end, togglProjects, projectRulesText] in
+      let cards = Self.timelineCards(from: start, through: end)
+      let rules = ProjectTaggingService.rules(from: projectRulesText)
+      let entries = TogglExportService.draftEntries(
+        from: cards,
+        projects: togglProjects,
+        rules: rules
+      )
+
+      await MainActor.run {
+        self.togglDraftEntries = entries
+        self.togglStatusMessage =
+          entries.isEmpty
+          ? "No timeline cards found for the selected range."
+          : "Prepared \(entries.count) Toggl draft entr\(entries.count == 1 ? "y" : "ies"). Review before submitting."
+        self.isPreparingTogglDraft = false
+      }
+    }
+  }
+
+  func updateTogglDraftEntry(_ entry: TogglExportDraftEntry) {
+    guard let index = togglDraftEntries.firstIndex(where: { $0.id == entry.id }) else { return }
+    togglDraftEntries[index] = entry
+  }
+
+  func submitSelectedTogglEntries() {
+    guard !isSubmittingTogglEntries else { return }
+    let token = currentTogglToken()
+    let workspaceID = togglWorkspaceIDText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let selectedEntries = togglDraftEntries.filter(\.isIncluded)
+
+    guard !token.isEmpty else {
+      togglErrorMessage = "Add and save a Toggl API token first."
+      return
+    }
+    guard !workspaceID.isEmpty else {
+      togglErrorMessage = "Add a Toggl workspace ID first."
+      return
+    }
+    guard !selectedEntries.isEmpty else {
+      togglErrorMessage = "Select at least one Toggl draft entry."
+      return
+    }
+
+    isSubmittingTogglEntries = true
+    togglStatusMessage = "Submitting \(selectedEntries.count) Toggl entr\(selectedEntries.count == 1 ? "y" : "ies")..."
+    togglErrorMessage = nil
+
+    Task {
+      var submitted = 0
+      do {
+        for entry in selectedEntries {
+          try await TogglExportService.createTimeEntry(
+            apiToken: token,
+            workspaceID: workspaceID,
+            entry: entry
+          )
+          submitted += 1
+          togglStatusMessage = "Submitted \(submitted) of \(selectedEntries.count) Toggl entries..."
+        }
+
+        let submittedIDs = Set(selectedEntries.map(\.id))
+        togglDraftEntries.removeAll { submittedIDs.contains($0.id) }
+        togglStatusMessage = "Submitted \(submitted) Toggl entr\(submitted == 1 ? "y" : "ies")."
+      } catch {
+        togglErrorMessage = "Submitted \(submitted) before failure. \(error.localizedDescription)"
+      }
+      isSubmittingTogglEntries = false
+    }
+  }
+
+  private func currentTogglToken() -> String {
+    let unsaved = togglAPITokenText.trimmingCharacters(in: .whitespacesAndNewlines)
+    return unsaved.isEmpty ? TogglExportSettings.loadAPIToken() : unsaved
+  }
+
   private func suggestedProjectName(from pattern: String) -> String {
     let base = pattern
       .split(separator: ".")
@@ -170,6 +329,21 @@ final class OtherSettingsViewModel: ObservableObject {
       .replacingOccurrences(of: "-", with: " ")
       .replacingOccurrences(of: "_", with: " ")
       .capitalized
+  }
+
+  nonisolated private static func timelineCards(from start: Date, through end: Date) -> [TimelineCard] {
+    let calendar = Calendar.current
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+
+    var cards: [TimelineCard] = []
+    var cursor = start
+    while cursor <= end {
+      cards.append(contentsOf: StorageManager.shared.fetchTimelineCards(forDay: formatter.string(from: cursor)))
+      guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
+      cursor = next
+    }
+    return cards
   }
 
   func refreshAnalyticsState() {

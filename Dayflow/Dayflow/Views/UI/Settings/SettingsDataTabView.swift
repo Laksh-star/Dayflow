@@ -14,6 +14,7 @@ struct SettingsDataTabView: View {
     VStack(alignment: .leading, spacing: SettingsStyle.sectionSpacing) {
       exportSection
       projectTaggingSection
+      togglExportSection
       reprocessSection
       repairSection
     }
@@ -110,6 +111,215 @@ struct SettingsDataTabView: View {
             .foregroundColor(SettingsStyle.destructive)
         }
       }
+    }
+  }
+
+  // MARK: - Toggl export
+
+  private var togglExportSection: some View {
+    let selectedCount = viewModel.togglDraftEntries.filter(\.isIncluded).count
+
+    return SettingsSection(
+      title: "Toggl export",
+      subtitle: "Review Dayflow cards as Toggl time entries before submitting through the Toggl API."
+    ) {
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(alignment: .top, spacing: 12) {
+          togglTextField(
+            title: "API token",
+            placeholder: "Toggl API token",
+            text: $viewModel.togglAPITokenText,
+            width: 260
+          )
+          .onChange(of: viewModel.togglAPITokenText) { _, _ in
+            viewModel.markTogglSettingsEdited()
+          }
+
+          togglTextField(
+            title: "Workspace ID",
+            placeholder: "1234567",
+            text: $viewModel.togglWorkspaceIDText,
+            width: 150
+          )
+          .onChange(of: viewModel.togglWorkspaceIDText) { _, _ in
+            viewModel.markTogglSettingsEdited()
+          }
+
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Actions")
+              .font(.custom("Figtree", size: 11))
+              .fontWeight(.semibold)
+              .textCase(.uppercase)
+              .foregroundColor(SettingsStyle.meta)
+
+            HStack(spacing: 8) {
+              SettingsSecondaryButton(
+                title: viewModel.isTogglSettingsSaved ? "Saved" : "Save",
+                isDisabled: viewModel.isTogglSettingsSaved,
+                action: viewModel.saveTogglSettings
+              )
+
+              SettingsSecondaryButton(
+                title: viewModel.isLoadingTogglProjects ? "Loading..." : "Load projects",
+                isDisabled: viewModel.isLoadingTogglProjects,
+                action: viewModel.loadTogglProjects
+              )
+            }
+          }
+        }
+
+        HStack(spacing: 12) {
+          SettingsSecondaryButton(
+            title: viewModel.isPreparingTogglDraft ? "Preparing..." : "Prepare draft from range",
+            isDisabled: viewModel.isPreparingTogglDraft,
+            action: viewModel.prepareTogglDraft
+          )
+
+          SettingsPrimaryButton(
+            title: viewModel.isSubmittingTogglEntries ? "Submitting..." : "Submit selected",
+            systemImage: viewModel.isSubmittingTogglEntries ? nil : "paperplane",
+            isLoading: viewModel.isSubmittingTogglEntries,
+            isDisabled: selectedCount == 0,
+            action: { viewModel.showSubmitTogglConfirm = true }
+          )
+
+          SettingsMetadata(
+            text:
+              "\(viewModel.togglProjects.count) projects • \(selectedCount) selected"
+          )
+        }
+
+        if !viewModel.togglDraftEntries.isEmpty {
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Draft entries")
+              .font(.custom("Figtree", size: 13))
+              .fontWeight(.semibold)
+              .foregroundColor(SettingsStyle.text)
+
+            ForEach($viewModel.togglDraftEntries) { $entry in
+              togglDraftRow(entry: $entry)
+            }
+          }
+        } else {
+          Text("Prepare a draft to review editable Toggl entries for the selected export date range.")
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if let status = viewModel.togglStatusMessage {
+          Text(status)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if let error = viewModel.togglErrorMessage {
+          Text(error)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.destructive)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      .alert("Submit Toggl entries?", isPresented: $viewModel.showSubmitTogglConfirm) {
+        Button("Cancel", role: .cancel) {}
+        Button("Submit") { viewModel.submitSelectedTogglEntries() }
+      } message: {
+        Text(
+          "This will create \(selectedCount) time entr\(selectedCount == 1 ? "y" : "ies") in Toggl for the selected draft rows."
+        )
+      }
+    }
+  }
+
+  private func togglTextField(
+    title: String,
+    placeholder: String,
+    text: Binding<String>,
+    width: CGFloat
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(title)
+        .font(.custom("Figtree", size: 11))
+        .fontWeight(.semibold)
+        .textCase(.uppercase)
+        .foregroundColor(SettingsStyle.meta)
+
+      TextField(placeholder, text: text)
+        .font(.custom("Figtree", size: 12))
+        .textFieldStyle(.plain)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(width: width)
+        .background(
+          RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .fill(Color.black.opacity(0.025))
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .stroke(SettingsStyle.divider, lineWidth: 1)
+        )
+    }
+  }
+
+  private func togglDraftRow(entry: Binding<TogglExportDraftEntry>) -> some View {
+    HStack(alignment: .top, spacing: 10) {
+      Toggle("", isOn: entry.isIncluded)
+        .toggleStyle(.checkbox)
+        .labelsHidden()
+        .padding(.top, 7)
+
+      VStack(alignment: .leading, spacing: 7) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+          Text(entry.wrappedValue.sourceProject)
+            .font(.custom("Figtree", size: 12))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.text)
+          Text(
+            "\(Self.togglTimeFormatter.string(from: entry.wrappedValue.start))-\(Self.togglTimeFormatter.string(from: entry.wrappedValue.end)) • \(entry.wrappedValue.durationMinutes) min"
+          )
+          .font(.custom("Figtree", size: 11))
+          .foregroundColor(SettingsStyle.meta)
+        }
+
+        TextField("Description", text: entry.description)
+          .font(.custom("Figtree", size: 12))
+          .textFieldStyle(.plain)
+          .padding(.horizontal, 9)
+          .padding(.vertical, 7)
+          .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+              .fill(Color.black.opacity(0.025))
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+              .stroke(SettingsStyle.divider, lineWidth: 1)
+          )
+
+        HStack(spacing: 8) {
+          Picker("Toggl project", selection: entry.togglProjectId) {
+            Text("No Toggl project").tag(Int64?.none)
+            ForEach(viewModel.togglProjects) { project in
+              Text(project.clientName.map { "\($0) / \(project.name)" } ?? project.name)
+                .tag(Int64?.some(project.id))
+            }
+          }
+          .pickerStyle(.menu)
+          .labelsHidden()
+          .frame(width: 260, alignment: .leading)
+
+          Text(entry.wrappedValue.sourceTitle)
+            .font(.custom("Figtree", size: 11))
+            .foregroundColor(SettingsStyle.meta)
+            .lineLimit(1)
+        }
+      }
+    }
+    .padding(.vertical, 8)
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(SettingsStyle.divider)
+        .frame(height: 1)
     }
   }
 
@@ -566,6 +776,12 @@ struct SettingsDataTabView: View {
   private static let dateLabelFormatter: DateFormatter = {
     let formatter = DateFormatter()
     formatter.setLocalizedDateFormatFromTemplate("MMM d, yyyy")
+    return formatter
+  }()
+
+  private static let togglTimeFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "MMM d, h:mm a"
     return formatter
   }()
 }
