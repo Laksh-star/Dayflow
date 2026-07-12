@@ -63,8 +63,6 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var showRetryFailedBatchesConfirm = false
   @Published var repairProviderOverrideId = "current"
   @Published var repairModelOverrideText = ""
-  @Published var standupStatusMessage: String?
-  @Published var standupErrorMessage: String?
 
   var repairProviderOverrideSupportsModel: Bool {
     repairProviderOverrideId == OpenAICompatibleProviderSettings.providerID
@@ -377,32 +375,6 @@ final class OtherSettingsViewModel: ObservableObject {
     default:
       return nil
     }
-  }
-
-  func copyStandupDraft() {
-    standupStatusMessage = nil
-    standupErrorMessage = nil
-
-    let today = timelineDisplayDate(from: Date())
-    guard let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today) else {
-      standupErrorMessage = "Could not calculate yesterday."
-      return
-    }
-
-    let todayString = DateFormatter.yyyyMMdd.string(from: today)
-    let yesterdayString = DateFormatter.yyyyMMdd.string(from: yesterday)
-    let todayCards = StorageManager.shared.fetchTimelineCards(forDay: todayString)
-    let yesterdayCards = StorageManager.shared.fetchTimelineCards(forDay: yesterdayString)
-
-    let text = StandupComposerService.compose(
-      yesterdayCards: yesterdayCards,
-      todayCards: todayCards,
-      projectRules: ProjectTaggingService.rules()
-    )
-
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(text, forType: .string)
-    standupStatusMessage = "Copied standup draft for \(yesterdayString) / \(todayString)."
   }
 
   @MainActor

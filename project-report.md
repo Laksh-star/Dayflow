@@ -16,17 +16,19 @@ This file tracks the local development work added on top of the upstream
 - Dev bundle ID: `teleportlabs.com.Dayflow.dev`
 - Dev data directory: `~/Library/Application Support/DayflowDev/`
 - Fork remote: `https://github.com/Laksh-star/Dayflow.git`
-- Latest pushed commit: `29be612 Add privacy diagnostics and project rollups`
+- Latest pushed commit: current branch HEAD, `Remove duplicate settings standup composer`
 
 ## Current Status
 
 - The dev fork is buildable and has a working shared Xcode scheme.
 - The CLI unit test path is working and currently covers provider settings, weekly dashboard logic, time parsing, privacy matching, and project-rule suggestions.
 - The paid/public app can remain uninstalled or unused while this fork is the active local Dayflow build.
-- New Settings areas now cover export, reprocess/repair, privacy rules, provider routing/API configuration, project tagging, and standup composition.
+- New Settings areas now cover export, reprocess/repair, privacy rules, provider routing/API configuration, and project tagging.
 
 ## Recent Commit Ledger
 
+- `HEAD` - Remove the duplicate Settings standup composer and keep Daily as the canonical standup workflow.
+- `8eb9829` - Update fork project report.
 - `29be612` - Add privacy diagnostics, privacy presets, improved domain matching, project rollups, and suggested project mappings.
 - `bb582fb` - Generalize API provider settings with profiles, auth modes, and token-parameter controls.
 - `b9c4012` - Add shared dev test scheme and fix the Dayflow Dev unit-test host/module setup.
@@ -50,7 +52,7 @@ This file tracks the local development work added on top of the upstream
 
 - Added timeline Markdown export from Settings.
 - Added Markdown v2 range export with frontmatter, daily sections, tags/categories, and weekly rollup content.
-- Added a standup-friendly text path for quick copy/paste into Slack or Teams.
+- Kept the Daily view as the canonical standup workflow with copy, regenerate, and export actions.
 
 ### OpenAI-compatible API provider
 
@@ -79,12 +81,12 @@ This file tracks the local development work added on top of the upstream
 - Added repair-run provider override so failed batches can be retried with the current provider, API, Gemini, ChatGPT CLI, Claude CLI, or local provider.
 - Added optional model override for API and Gemini repair retries.
 
-### Project and standup utilities
+### Project utilities
 
 - Added project/client tagging rules based on keywords, domains, apps, and card text.
 - Added Settings rollups for today's time by project/client.
 - Added suggested project mappings from untagged observed cards.
-- Added standup composer for Yesterday / Today / Blockers text.
+- Removed the duplicate Settings standup composer so the Daily standup surface remains the single user-facing workflow.
 
 ## Local-only Changes
 
@@ -102,7 +104,7 @@ Good candidates for focused upstream pull requests:
 - OpenAI-compatible API provider, if generalized and documented.
 - Privacy exclusion UI and capture rules.
 - Failed-batch repair controls.
-- Standup composer and project tagging, if framed as optional productivity tools.
+- Project tagging, if framed as an optional productivity tool.
 
 Recommended upstream order:
 
@@ -110,7 +112,7 @@ Recommended upstream order:
 2. OpenAI-compatible API provider.
 3. Privacy exclusion rules.
 4. Failed-batch repair controls.
-5. Project tagging and standup composer.
+5. Project tagging.
 
 ## Known Gaps
 

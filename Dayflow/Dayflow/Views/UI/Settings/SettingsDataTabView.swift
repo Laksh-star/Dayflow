@@ -14,7 +14,6 @@ struct SettingsDataTabView: View {
     VStack(alignment: .leading, spacing: SettingsStyle.sectionSpacing) {
       exportSection
       projectTaggingSection
-      standupSection
       reprocessSection
       repairSection
     }
@@ -222,37 +221,6 @@ struct SettingsDataTabView: View {
               }
             }
           }
-        }
-      }
-    }
-  }
-
-  // MARK: - Standup composer
-
-  private var standupSection: some View {
-    SettingsSection(
-      title: "Standup composer",
-      subtitle: "Create Slack or Teams-ready Yesterday / Today / Blockers text."
-    ) {
-      VStack(alignment: .leading, spacing: 12) {
-        HStack(spacing: 12) {
-          SettingsPrimaryButton(
-            title: "Copy standup draft",
-            systemImage: "doc.on.clipboard",
-            action: viewModel.copyStandupDraft
-          )
-
-          if let status = viewModel.standupStatusMessage {
-            Text(status)
-              .font(.custom("Figtree", size: 12))
-              .foregroundColor(SettingsStyle.secondary)
-          }
-        }
-
-        if let error = viewModel.standupErrorMessage {
-          Text(error)
-            .font(.custom("Figtree", size: 12))
-            .foregroundColor(SettingsStyle.destructive)
         }
       }
     }
