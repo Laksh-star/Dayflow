@@ -8,6 +8,7 @@ This file tracks the local development work added on top of the upstream
 - Run a dev-safe Dayflow variant without colliding with the installed production app.
 - Add practical export, provider, repair, and privacy tooling for local experimentation.
 - Keep changes organized so upstream-friendly pieces can later be proposed as focused PRs.
+- Fork/upstream development practices are documented in `docs/fork-development-practices.md`.
 
 ## Current Branch
 
