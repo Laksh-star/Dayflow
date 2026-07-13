@@ -2,222 +2,102 @@ import AppKit
 import SwiftUI
 
 struct SettingsAccountSection: View {
-  @ObservedObject private var authManager = DayflowAuthManager.shared
-  @State private var isAuthSheetPresented = false
-  @State private var selectedBillingInterval: DayflowBillingInterval = .yearly
-  @State private var inviteEmail = ""
-  @State private var applyReferralCode = ""
-  @State private var copiedReferralLink = false
+  private let appSupportPath =
+    FileManager.default.homeDirectoryForCurrentUser
+    .appendingPathComponent("Library/Application Support/DayflowDev")
+    .path
 
   var body: some View {
     VStack(alignment: .leading, spacing: SettingsStyle.sectionSpacing) {
-      if authManager.entitlements.status == "active" {
-        currentPlanSection
-      } else {
-        accountSection
-        upgradeSection
-      }
-
-      referralSection
-
-      if let errorText = authManager.errorText {
-        Text(errorText)
-          .font(.custom("Figtree", size: 11))
-          .foregroundColor(SettingsStyle.destructive)
-          .textSelection(.enabled)
-      }
-    }
-    .sheet(isPresented: $isAuthSheetPresented) {
-      DayflowSignInSheet {
-        isAuthSheetPresented = false
-      }
-      .frame(width: 430)
-    }
-    .task {
-      authManager.loadStoredSessionIfNeeded()
-    }
-    .onChange(of: authManager.pendingReferralCode) { _, pendingCode in
-      guard let pendingCode, applyReferralCode.isEmpty else { return }
-      applyReferralCode = pendingCode
+      localForkSection
     }
   }
 
-  private var accountSection: some View {
+  private var localForkSection: some View {
     SettingsSection(
-      title: "Account",
-      subtitle: "Sign in once to keep Dayflow Pro and cloud features attached to this Mac."
+      title: "LN's Dayflow Dev",
+      subtitle: "This fork runs locally with your own providers, storage, exports, and integrations."
     ) {
-      VStack(alignment: .leading, spacing: 0) {
-        SettingsRow(
-          label: "Dayflow account",
-          subtitle: authManager.isSignedIn
-            ? authManager.displayIdentity
-            : nil,
-          showsDivider: authManager.isSignedIn
-        ) {
-          HStack(spacing: 8) {
-            SettingsStatusDot(
-              state: authManager.isSignedIn ? .good : .warn,
-              label: authManager.isSignedIn ? "Signed in" : "Signed out"
-            )
+      VStack(alignment: .leading, spacing: 18) {
+        HStack(alignment: .top, spacing: 14) {
+          Image("DayflowLogo")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 38, height: 38)
 
-            if authManager.isSignedIn {
-              SettingsSecondaryButton(
-                title: "Sign out",
-                systemImage: "rectangle.portrait.and.arrow.right",
-                isDisabled: authManager.isBusy,
-                action: { Task { await authManager.signOut() } }
-              )
-            } else {
-              SettingsPrimaryButton(
-                title: "Sign in",
-                systemImage: "person.crop.circle",
-                isLoading: authManager.isBusy && authManager.hasLoadedStoredSession == false,
-                action: { isAuthSheetPresented = true }
-              )
+          VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+              Text("Local fork mode")
+                .font(.custom("Figtree", size: 18))
+                .fontWeight(.bold)
+                .foregroundColor(SettingsStyle.text)
+
+              SettingsBadge(text: "DEV", isAccent: true)
             }
+
+            Text(
+              "Pro billing, referrals, and hosted-account upgrade flows are hidden in this build so the settings reflect the fork you are actively developing."
+            )
+            .font(.custom("Figtree", size: 13))
+            .foregroundColor(SettingsStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
           }
         }
-      }
-    }
-  }
 
-  private var currentPlanSection: some View {
-    SettingsSection(
-      title: "Account",
-      subtitle: "Manage your Dayflow account and subscription."
-    ) {
-      ActiveProCard(
-        entitlement: authManager.entitlements,
-        email: authManager.displayIdentity,
-        isBusy: authManager.isBusy,
-        signOutAction: { Task { await authManager.signOut() } },
-        manageBillingAction: { Task { await authManager.openBillingPortal() } }
+        HStack(alignment: .top, spacing: 12) {
+          LocalForkInfoTile(label: "App", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Dayflow Dev")
+          LocalForkInfoTile(label: "Bundle ID", value: Bundle.main.bundleIdentifier ?? "teleportlabs.com.Dayflow.dev")
+        }
+
+        HStack(alignment: .top, spacing: 12) {
+          LocalForkInfoTile(label: "Data folder", value: appSupportPath)
+          LocalForkInfoTile(label: "Installed app", value: "/Applications/Dayflow Dev.app")
+        }
+
+        VStack(alignment: .leading, spacing: 7) {
+          SettingsStatusDot(state: .good, label: "Local storage isolated")
+          SettingsStatusDot(state: .good, label: "Provider setup lives under Settings > Providers")
+          SettingsStatusDot(state: .good, label: "Exports, Toggl, repair, and project tagging live under Settings > Export")
+        }
+      }
+      .padding(18)
+      .background(
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+          .fill(Color.white)
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+          .stroke(SettingsStyle.divider, lineWidth: 1)
       )
     }
   }
+}
 
-  private var upgradeSection: some View {
-    SettingsSection(
-      title: "Upgrade to Dayflow Pro",
-      subtitle: "Pick a plan, then finish securely in Stripe Checkout."
-    ) {
-      VStack(alignment: .leading, spacing: 16) {
-        HStack(alignment: .top, spacing: 12) {
-          BillingPlanCard(
-            title: "Monthly",
-            price: "$20",
-            cadence: "/mo",
-            note: "Flexible monthly billing.",
-            badge: nil,
-            isSelected: selectedBillingInterval == .monthly
-          ) {
-            withAnimation(.easeOut(duration: 0.16)) {
-              selectedBillingInterval = .monthly
-            }
-          }
+private struct LocalForkInfoTile: View {
+  let label: String
+  let value: String
 
-          BillingPlanCard(
-            title: "Yearly",
-            price: "$15",
-            cadence: "/mo",
-            note: "Billed yearly.",
-            badge: "2 months free",
-            isSelected: selectedBillingInterval == .yearly
-          ) {
-            withAnimation(.easeOut(duration: 0.16)) {
-              selectedBillingInterval = .yearly
-            }
-          }
-        }
-        .padding(.leading, 2)
+  var body: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      Text(label.uppercased())
+        .font(.custom("Figtree", size: 10))
+        .fontWeight(.bold)
+        .foregroundColor(SettingsStyle.meta)
 
-        ProFeatureList()
-
-        HStack(alignment: .center, spacing: 12) {
-          SettingsPrimaryButton(
-            title: authManager.isSignedIn ? "Start 14-day trial" : "Sign in to upgrade",
-            systemImage: authManager.isSignedIn ? "creditcard" : "person.crop.circle",
-            isLoading: authManager.isBusy,
-            action: upgradeAction
-          )
-
-          VStack(alignment: .leading, spacing: 4) {
-            Text("Cancel any time. No-questions-asked refunds.")
-              .font(.custom("Figtree", size: 12))
-              .foregroundColor(SettingsStyle.secondary)
-              .fixedSize(horizontal: false, vertical: true)
-
-            SettingsLinkButton(title: "Privacy policy", systemImage: "lock") {
-              openPrivacyPolicy()
-            }
-          }
-        }
-      }
+      Text(value)
+        .font(.custom("Figtree", size: 12))
+        .fontWeight(.semibold)
+        .foregroundColor(SettingsStyle.text)
+        .lineLimit(2)
+        .truncationMode(.middle)
+        .textSelection(.enabled)
     }
-  }
-
-  private var referralSection: some View {
-    ReferralProgramCard(
-      summary: authManager.referralSummary,
-      inviteEmail: $inviteEmail,
-      applyReferralCode: $applyReferralCode,
-      copiedReferralLink: copiedReferralLink,
-      isSignedIn: authManager.isSignedIn,
-      isBusy: authManager.isBusy,
-      copyAction: copyReferralLink,
-      sendInviteAction: sendInvite,
-      applyCodeAction: applyReferralCodeAction,
-      signInAction: { isAuthSheetPresented = true },
-      refreshAction: { Task { await authManager.refreshReferrals() } }
-    )
     .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private func upgradeAction() {
-    guard authManager.isSignedIn else {
-      isAuthSheetPresented = true
-      return
-    }
-
-    Task {
-      await authManager.openBillingCheckout(interval: selectedBillingInterval)
-    }
-  }
-
-  private func openPrivacyPolicy() {
-    guard let url = URL(string: "https://dayflow.so/privacy") else { return }
-    NSWorkspace.shared.open(url)
-  }
-
-  private func copyReferralLink() {
-    guard let inviteURL = authManager.referralSummary?.inviteURL else { return }
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(inviteURL, forType: .string)
-    copiedReferralLink = true
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-      copiedReferralLink = false
-    }
-  }
-
-  private func sendInvite() {
-    Task {
-      await authManager.sendReferralInvite(to: inviteEmail)
-      if authManager.errorText == nil {
-        inviteEmail = ""
-      }
-    }
-  }
-
-  private func applyReferralCodeAction() {
-    let code = applyReferralCode.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !code.isEmpty else { return }
-    Task {
-      await authManager.claimReferralCode(code)
-      if authManager.errorText == nil {
-        applyReferralCode = ""
-      }
-    }
+    .padding(12)
+    .background(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .fill(Color.black.opacity(0.025))
+    )
   }
 }
 

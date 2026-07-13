@@ -16,7 +16,7 @@ This file tracks the local development work added on top of the upstream
 - Dev bundle ID: `teleportlabs.com.Dayflow.dev`
 - Dev data directory: `~/Library/Application Support/DayflowDev/`
 - Fork remote: `https://github.com/Laksh-star/Dayflow.git`
-- Latest pushed commit: current branch HEAD, `Add privacy diagnostics and Toggl export`
+- Latest pushed commit: current branch HEAD, `Document Toggl export implementation`
 
 ## Current Status
 
@@ -87,7 +87,9 @@ This file tracks the local development work added on top of the upstream
 - Draft rows are generated from timeline cards and use Dayflow project-tagging rules as the first-pass source project.
 - Draft rows let the user include/exclude entries, edit the Toggl description, and select a real Toggl project before submitting.
 - Submits selected rows through `POST /api/v9/workspaces/{workspace_id}/time_entries`.
-- Important UI note: Dayflow "Project tagging" is local mapping (`Project=keyword,domain,app`) and is not the same thing as Toggl projects. The next UI cleanup should rename that section to "Dayflow project tagging" and make the Toggl project picker more visibly separate.
+- Settings > Export now separates local Dayflow tags from real Toggl projects.
+- Toggl project mappings use `Dayflow tag=Toggl project` rows so local Dayflow rollups can target explicit Toggl workspace projects.
+- Draft preparation checks existing Toggl time entries for the selected date range and unchecks likely duplicates before submit.
 
 ### Reprocess and repair controls
 
@@ -103,6 +105,12 @@ This file tracks the local development work added on top of the upstream
 - Added Settings rollups for today's time by project/client.
 - Added suggested project mappings from untagged observed cards.
 - Removed the duplicate Settings standup composer so the Daily standup surface remains the single user-facing workflow.
+
+### Fork account surface
+
+- Replaced the upstream Pro pricing, referral, and upgrade UI in Settings > Account with a local fork status panel.
+- The fork panel identifies `LN's Dayflow Dev`, the dev bundle ID, the isolated `DayflowDev` data folder, and `/Applications/Dayflow Dev.app` as the intended installed app.
+- Recommendation: keep commercial Dayflow Pro billing/referral surfaces out of this local fork unless a future upstream PR specifically touches account management.
 
 ## Local-only Changes
 
@@ -154,20 +162,18 @@ Recommended upstream order:
 - Privacy preview is app/window oriented; it does not yet show screenshot redaction thumbnails.
 - Project tagging is rules-based and lightweight; it does not yet infer repo paths or Git metadata.
 - Suggested project mappings currently append simple `Project=pattern` rules and do not edit existing project rows in place.
-- Toggl export has no duplicate-detection against existing Toggl entries yet; the user must review before submitting.
-- Toggl export currently maps Dayflow projects to Toggl projects by name similarity and then relies on user review/editing.
-- Toggl UI labels need cleanup because local Dayflow project tags and real Toggl workspace projects are easy to confuse.
+- Toggl duplicate detection is heuristic; it checks close start/end matches and overlapping entries with matching descriptions or project IDs.
+- Toggl export supports explicit Dayflow-tag-to-Toggl-project mappings, but it does not yet support Toggl tasks, tags, or billable flags.
 
 ## Next Priorities
 
 1. Run Dayflow Dev for another real work session and validate cards, privacy blocking, repair retries, exports, and project rollups against actual usage.
 2. Add API provider v2 support for arbitrary extra headers and provider-specific request metadata.
-3. Clean up Settings > Export wording so Dayflow project tags and Toggl projects are visually distinct.
-4. Add screenshot/redaction thumbnail preview for privacy rules.
-5. Improve project tagging edits so suggestions can merge into existing project rows instead of always appending new rules.
-6. Start Git/repo context enrichment for project inference.
-7. Add Toggl duplicate detection and richer project/task mapping before broader use.
-8. Monitor draft PR [#319](https://github.com/JerryZLiu/Dayflow/pull/319), respond to maintainer feedback, and make it ready for review once the scope looks acceptable.
+3. Add screenshot/redaction thumbnail preview for privacy rules.
+4. Improve project tagging edits so suggestions can merge into existing project rows instead of always appending new rules.
+5. Start Git/repo context enrichment for project inference.
+6. Add Toggl task/tag/billable mappings before broader use.
+7. Monitor draft PR [#319](https://github.com/JerryZLiu/Dayflow/pull/319), respond to maintainer feedback, and make it ready for review once the scope looks acceptable.
 
 ## Verification Notes
 

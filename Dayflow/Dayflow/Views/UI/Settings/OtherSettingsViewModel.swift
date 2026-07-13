@@ -45,9 +45,11 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var projectRollupStatusMessage: String?
   @Published var togglAPITokenText: String
   @Published var togglWorkspaceIDText: String
+  @Published var togglProjectMappingsText: String
   @Published var togglProjects: [TogglProject] = []
   @Published var togglDraftEntries: [TogglExportDraftEntry] = []
   @Published var isTogglSettingsSaved = true
+  @Published var isTogglProjectMappingsSaved = true
   @Published var isLoadingTogglProjects = false
   @Published var isPreparingTogglDraft = false
   @Published var isSubmittingTogglEntries = false
@@ -110,6 +112,7 @@ final class OtherSettingsViewModel: ObservableObject {
     projectRulesText = ProjectTaggingService.rulesText
     togglAPITokenText = TogglExportSettings.loadAPIToken()
     togglWorkspaceIDText = TogglExportSettings.workspaceID
+    togglProjectMappingsText = TogglExportSettings.projectMappingsText
     exportStartDate = timelineDisplayDate(from: Date())
     exportEndDate = timelineDisplayDate(from: Date())
     reprocessDayDate = timelineDisplayDate(from: Date())
@@ -182,6 +185,12 @@ final class OtherSettingsViewModel: ObservableObject {
         == TogglExportSettings.workspaceID.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
+  func markTogglProjectMappingsEdited() {
+    isTogglProjectMappingsSaved =
+      togglProjectMappingsText.trimmingCharacters(in: .whitespacesAndNewlines)
+      == TogglExportSettings.projectMappingsText.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
   func saveTogglSettings() {
     togglAPITokenText = togglAPITokenText.trimmingCharacters(in: .whitespacesAndNewlines)
     togglWorkspaceIDText = togglWorkspaceIDText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -191,6 +200,16 @@ final class OtherSettingsViewModel: ObservableObject {
     togglErrorMessage = tokenSaved ? nil : "Couldn't save Toggl API token to Keychain."
     if tokenSaved {
       togglStatusMessage = "Toggl settings saved."
+    }
+  }
+
+  func saveTogglProjectMappings() {
+    togglProjectMappingsText = togglProjectMappingsText.trimmingCharacters(in: .whitespacesAndNewlines)
+    TogglExportSettings.projectMappingsText = togglProjectMappingsText
+    isTogglProjectMappingsSaved = true
+    togglStatusMessage = "Toggl project mappings saved."
+    if !togglDraftEntries.isEmpty {
+      prepareTogglDraft()
     }
   }
 
@@ -234,6 +253,8 @@ final class OtherSettingsViewModel: ObservableObject {
     guard !isPreparingTogglDraft else { return }
     let start = timelineDisplayDate(from: exportStartDate)
     let end = timelineDisplayDate(from: exportEndDate)
+    let token = currentTogglToken()
+    let workspaceID = togglWorkspaceIDText.trimmingCharacters(in: .whitespacesAndNewlines)
 
     guard start <= end else {
       togglErrorMessage = "Start date must be on or before end date."
@@ -244,21 +265,55 @@ final class OtherSettingsViewModel: ObservableObject {
     togglStatusMessage = nil
     togglErrorMessage = nil
 
-    Task.detached(priority: .userInitiated) { [start, end, togglProjects, projectRulesText] in
+    Task.detached(priority: .userInitiated) { [
+      start,
+      end,
+      token,
+      workspaceID,
+      togglProjects,
+      projectRulesText,
+      togglProjectMappingsText
+    ] in
       let cards = Self.timelineCards(from: start, through: end)
       let rules = ProjectTaggingService.rules(from: projectRulesText)
-      let entries = TogglExportService.draftEntries(
+      let mappings = TogglExportSettings.projectMappings(from: togglProjectMappingsText)
+      var entries = TogglExportService.draftEntries(
         from: cards,
         projects: togglProjects,
-        rules: rules
+        rules: rules,
+        projectMappings: mappings
       )
+      var duplicateStatus: String?
+
+      if !token.isEmpty, !workspaceID.isEmpty, !entries.isEmpty {
+        do {
+          let existing = try await TogglExportService.fetchTimeEntries(
+            apiToken: token,
+            start: start,
+            end: Calendar.current.date(byAdding: .day, value: 1, to: end) ?? end
+          )
+          entries = TogglExportService.markingExistingDuplicates(
+            draftEntries: entries,
+            existingEntries: existing
+          )
+          let duplicateCount = entries.filter { $0.duplicateWarning != nil }.count
+          if duplicateCount > 0 {
+            duplicateStatus = "\(duplicateCount) possible duplicate\(duplicateCount == 1 ? "" : "s") found in Toggl and unchecked."
+          }
+        } catch {
+          duplicateStatus = "Draft prepared, but existing Toggl entries could not be checked: \(error.localizedDescription)"
+        }
+      } else if !entries.isEmpty {
+        duplicateStatus = "Draft prepared without duplicate checks. Save a Toggl token and workspace ID to check existing entries."
+      }
 
       await MainActor.run {
         self.togglDraftEntries = entries
-        self.togglStatusMessage =
+        let baseMessage =
           entries.isEmpty
           ? "No timeline cards found for the selected range."
           : "Prepared \(entries.count) Toggl draft entr\(entries.count == 1 ? "y" : "ies"). Review before submitting."
+        self.togglStatusMessage = [baseMessage, duplicateStatus].compactMap(\.self).joined(separator: " ")
         self.isPreparingTogglDraft = false
       }
     }

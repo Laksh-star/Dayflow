@@ -118,10 +118,11 @@ struct SettingsDataTabView: View {
 
   private var togglExportSection: some View {
     let selectedCount = viewModel.togglDraftEntries.filter(\.isIncluded).count
+    let duplicateCount = viewModel.togglDraftEntries.filter { $0.duplicateWarning != nil }.count
 
     return SettingsSection(
       title: "Toggl export",
-      subtitle: "Review Dayflow cards as Toggl time entries before submitting through the Toggl API."
+      subtitle: "Map local Dayflow tags to real Toggl workspace projects, then review entries before submitting."
     ) {
       VStack(alignment: .leading, spacing: 14) {
         HStack(alignment: .top, spacing: 12) {
@@ -185,8 +186,45 @@ struct SettingsDataTabView: View {
 
           SettingsMetadata(
             text:
-              "\(viewModel.togglProjects.count) projects • \(selectedCount) selected"
+              "\(viewModel.togglProjects.count) Toggl projects • \(selectedCount) selected • \(duplicateCount) possible duplicates"
           )
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(spacing: 12) {
+            Text("Project mappings")
+              .font(.custom("Figtree", size: 13))
+              .fontWeight(.semibold)
+              .foregroundColor(SettingsStyle.text)
+
+            SettingsSecondaryButton(
+              title: viewModel.isTogglProjectMappingsSaved ? "Mappings saved" : "Save mappings",
+              isDisabled: viewModel.isTogglProjectMappingsSaved,
+              action: viewModel.saveTogglProjectMappings
+            )
+
+            Text("Format: Dayflow tag=Toggl project")
+              .font(.custom("Figtree", size: 12))
+              .foregroundColor(SettingsStyle.meta)
+          }
+
+          TextEditor(text: $viewModel.togglProjectMappingsText)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.text)
+            .scrollContentBackground(.hidden)
+            .padding(8)
+            .frame(minHeight: 70, maxHeight: 100)
+            .background(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.black.opacity(0.025))
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(SettingsStyle.divider, lineWidth: 1)
+            )
+            .onChange(of: viewModel.togglProjectMappingsText) { _, _ in
+              viewModel.markTogglProjectMappingsEdited()
+            }
         }
 
         if !viewModel.togglDraftEntries.isEmpty {
@@ -313,6 +351,13 @@ struct SettingsDataTabView: View {
             .foregroundColor(SettingsStyle.meta)
             .lineLimit(1)
         }
+
+        if let duplicateWarning = entry.wrappedValue.duplicateWarning {
+          Text(duplicateWarning)
+            .font(.custom("Figtree", size: 11))
+            .foregroundColor(SettingsStyle.destructive)
+            .fixedSize(horizontal: false, vertical: true)
+        }
       }
     }
     .padding(.vertical, 8)
@@ -327,8 +372,8 @@ struct SettingsDataTabView: View {
 
   private var projectTaggingSection: some View {
     SettingsSection(
-      title: "Project tagging",
-      subtitle: "Map domains, app names, file names, and card text to project/client tags."
+      title: "Dayflow project tagging",
+      subtitle: "Map domains, app names, file names, and card text to local Dayflow tags. These are not Toggl projects until you map them below."
     ) {
       VStack(alignment: .leading, spacing: 12) {
         TextEditor(text: $viewModel.projectRulesText)
@@ -361,7 +406,7 @@ struct SettingsDataTabView: View {
             action: viewModel.refreshProjectRollups
           )
 
-          Text("Format: Project=keyword,domain,app")
+          Text("Format: Dayflow tag=keyword,domain,app")
             .font(.custom("Figtree", size: 12))
             .foregroundColor(SettingsStyle.meta)
         }
@@ -381,7 +426,7 @@ struct SettingsDataTabView: View {
 
       if !viewModel.projectRollups.isEmpty {
         VStack(alignment: .leading, spacing: 8) {
-          Text("Today by project")
+          Text("Today by Dayflow tag")
             .font(.custom("Figtree", size: 13))
             .fontWeight(.semibold)
             .foregroundColor(SettingsStyle.text)
@@ -408,7 +453,7 @@ struct SettingsDataTabView: View {
 
       if !viewModel.projectRuleSuggestions.isEmpty {
         VStack(alignment: .leading, spacing: 8) {
-          Text("Suggested mappings from untagged cards")
+          Text("Suggested Dayflow tag mappings")
             .font(.custom("Figtree", size: 13))
             .fontWeight(.semibold)
             .foregroundColor(SettingsStyle.text)
