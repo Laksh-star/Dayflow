@@ -67,6 +67,7 @@ This file tracks the local development work added on top of the upstream
 - Added API profiles for OpenAI, OpenRouter, LiteLLM, local proxies, and custom endpoints.
 - Added configurable auth headers: Bearer token, x-api-key, custom header, or no auth header.
 - Added token-parameter override so providers can force `max_tokens` or `max_completion_tokens` when auto-detection is wrong.
+- Relaxed API/OpenAI-compatible card validation so a coherent continuation card up to 90 minutes does not fail the whole batch.
 
 ### Privacy rules engine
 

@@ -494,9 +494,12 @@ final class OllamaProvider {
           "Card \(index + 1) '\(card.title)' is only \(String(format: "%.1f", duration)) minutes; merge short middle cards."
         )
       }
-      if duration > 65 {
+      // OpenAI-compatible providers sometimes summarize a coherent activity across
+      // adjacent context windows. Prefer 15-60 minute cards in the prompt, but do
+      // not fail the whole batch for a slightly-long continuation card.
+      if duration > 90 {
         errors.append(
-          "Card \(index + 1) '\(card.title)' is \(String(format: "%.1f", duration)) minutes; split cards longer than 60 minutes."
+          "Card \(index + 1) '\(card.title)' is \(String(format: "%.1f", duration)) minutes; split cards longer than 90 minutes."
         )
       }
     }
