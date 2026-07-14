@@ -56,6 +56,22 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var togglStatusMessage: String?
   @Published var togglErrorMessage: String?
   @Published var showSubmitTogglConfirm = false
+  @Published var mobileContextInboxPath: String
+  @Published var mobileContextIncludeInExports: Bool {
+    didSet {
+      guard mobileContextIncludeInExports != oldValue else { return }
+      MobileContextSettings.includeInExports = mobileContextIncludeInExports
+    }
+  }
+  @Published var mobileContextIncludeInDaily: Bool {
+    didSet {
+      guard mobileContextIncludeInDaily != oldValue else { return }
+      MobileContextSettings.includeInDaily = mobileContextIncludeInDaily
+    }
+  }
+  @Published var isMobileContextInboxPathSaved = true
+  @Published var mobileContextStatusMessage: String?
+  @Published var mobileContextErrorMessage: String?
 
   @Published var exportStartDate: Date
   @Published var exportEndDate: Date
@@ -113,11 +129,15 @@ final class OtherSettingsViewModel: ObservableObject {
     togglAPITokenText = TogglExportSettings.loadAPIToken()
     togglWorkspaceIDText = TogglExportSettings.workspaceID
     togglProjectMappingsText = TogglExportSettings.projectMappingsText
+    mobileContextInboxPath = MobileContextSettings.inboxFolderPath
+    mobileContextIncludeInExports = MobileContextSettings.includeInExports
+    mobileContextIncludeInDaily = MobileContextSettings.includeInDaily
     exportStartDate = timelineDisplayDate(from: Date())
     exportEndDate = timelineDisplayDate(from: Date())
     reprocessDayDate = timelineDisplayDate(from: Date())
     refreshRepairSummary()
     refreshProjectRollups()
+    refreshMobileContextStatus()
   }
 
   func markOutputLanguageOverrideEdited() {
@@ -211,6 +231,53 @@ final class OtherSettingsViewModel: ObservableObject {
     if !togglDraftEntries.isEmpty {
       prepareTogglDraft()
     }
+  }
+
+  func markMobileContextInboxPathEdited() {
+    isMobileContextInboxPathSaved =
+      mobileContextInboxPath.trimmingCharacters(in: .whitespacesAndNewlines)
+      == MobileContextSettings.inboxFolderPath.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  func saveMobileContextInboxPath() {
+    mobileContextInboxPath = mobileContextInboxPath.trimmingCharacters(in: .whitespacesAndNewlines)
+    if mobileContextInboxPath.isEmpty {
+      mobileContextInboxPath = MobileContextSettings.defaultInboxURL.path
+    }
+    MobileContextSettings.inboxFolderPath = mobileContextInboxPath
+    isMobileContextInboxPathSaved = true
+    refreshMobileContextStatus()
+  }
+
+  func useDefaultMobileContextInboxPath() {
+    mobileContextInboxPath = MobileContextSettings.defaultInboxURL.path
+    saveMobileContextInboxPath()
+  }
+
+  func createMobileContextInboxFolder() {
+    saveMobileContextInboxPath()
+    if MobileContextService.ensureInboxFolderExists() {
+      refreshMobileContextStatus()
+    } else {
+      mobileContextStatusMessage = nil
+      mobileContextErrorMessage = "Couldn't create the mobile inbox folder."
+    }
+  }
+
+  func openMobileContextInboxFolder() {
+    createMobileContextInboxFolder()
+    let url = URL(fileURLWithPath: MobileContextSettings.inboxFolderPath, isDirectory: true)
+    NSWorkspace.shared.open(url)
+  }
+
+  func refreshMobileContextStatus() {
+    let today = DateFormatter.yyyyMMdd.string(from: timelineDisplayDate(from: Date()))
+    let folderURL = URL(fileURLWithPath: MobileContextSettings.inboxFolderPath, isDirectory: true)
+    let exists = FileManager.default.fileExists(atPath: folderURL.path)
+    let notes = MobileContextService.notes(forDay: today)
+    mobileContextErrorMessage = exists ? nil : "Folder does not exist yet. Create it before using your iPhone shortcut."
+    mobileContextStatusMessage =
+      "\(notes.count) mobile note\(notes.count == 1 ? "" : "s") matched for today. Folder: \(folderURL.path)"
   }
 
   func loadTogglProjects() {
@@ -444,10 +511,14 @@ final class OtherSettingsViewModel: ObservableObject {
         cursor = next
       }
 
+      let mobileNotes =
+        MobileContextSettings.includeInExports
+        ? MobileContextService.notes(from: start, through: end) : []
       let exportText = MarkdownV2RangeExportBuilder.makeMarkdown(
         start: start,
         end: end,
-        cardsByDay: cardsByDay
+        cardsByDay: cardsByDay,
+        mobileNotes: mobileNotes
       )
       let finalDayCount = dayCount
       let finalActivityCount = totalActivities

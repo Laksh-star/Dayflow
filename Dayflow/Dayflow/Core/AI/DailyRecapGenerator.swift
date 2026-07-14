@@ -5,6 +5,7 @@ struct DailyRecapGenerationContext: Sendable {
   let sourceDayString: String
   let cards: [TimelineCard]
   let observations: [Observation]
+  let mobileNotes: [MobileContextNote]
   let priorEntries: [DailyStandupEntry]
   let highlightsTitle: String
   let tasksTitle: String
@@ -291,6 +292,10 @@ final class DailyRecapGenerator {
     .joined(separator: "\n\n")
   }
 
+  static func makeMobileContextText(day: String, notes: [MobileContextNote]) -> String {
+    MobileContextService.makeNotesText(day: day, notes: notes)
+  }
+
   static func makePreferencesText(
     highlightsTitle: String,
     tasksTitle: String,
@@ -325,7 +330,7 @@ final class DailyRecapGenerator {
 
     let request = DayflowDailyGenerationRequest(
       day: context.sourceDayString,
-      cardsText: Self.makeCardsText(day: context.sourceDayString, cards: context.cards),
+      cardsText: Self.makeCardsAndMobileContextText(context: context),
       observationsText: Self.makeObservationsText(
         day: context.sourceDayString,
         observations: context.observations
@@ -376,7 +381,11 @@ final class DailyRecapGenerator {
       apiKey: apiKey,
       preference: GeminiModelPreference(primary: .flash35)
     )
-    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let prompt = Self.makeLocalPrompt(
+      day: context.sourceDayString,
+      cards: context.cards,
+      mobileNotes: context.mobileNotes
+    )
     let (rawText, _) = try await provider.generateText(
       prompt: prompt,
       maxOutputTokens: Self.localRecapMaxOutputTokens
@@ -393,7 +402,11 @@ final class DailyRecapGenerator {
       throw DailyRecapGeneratorError.missingLocalConfiguration
     }
 
-    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let prompt = Self.makeLocalPrompt(
+      day: context.sourceDayString,
+      cards: context.cards,
+      mobileNotes: context.mobileNotes
+    )
     let (rawText, _) = try await provider.generateText(
       prompt: prompt,
       maxTokens: Self.localRecapMaxOutputTokens
@@ -411,7 +424,11 @@ final class DailyRecapGenerator {
       throw DailyRecapGeneratorError.missingLocalConfiguration
     }
 
-    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let prompt = Self.makeLocalPrompt(
+      day: context.sourceDayString,
+      cards: context.cards,
+      mobileNotes: context.mobileNotes
+    )
     let (rawText, _) = try await provider.generateText(
       prompt: prompt,
       maxTokens: Self.localRecapMaxOutputTokens
@@ -429,7 +446,11 @@ final class DailyRecapGenerator {
     }
 
     let provider = ChatCLIProvider(tool: .codex)
-    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let prompt = Self.makeLocalPrompt(
+      day: context.sourceDayString,
+      cards: context.cards,
+      mobileNotes: context.mobileNotes
+    )
     let (rawText, _) = try await provider.generateText(
       prompt: prompt,
       model: "gpt-5.4",
@@ -449,7 +470,11 @@ final class DailyRecapGenerator {
     }
 
     let provider = ChatCLIProvider(tool: .claude)
-    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let prompt = Self.makeLocalPrompt(
+      day: context.sourceDayString,
+      cards: context.cards,
+      mobileNotes: context.mobileNotes
+    )
     let (rawText, _) = try await provider.generateText(
       prompt: prompt,
       model: "opus",
@@ -562,18 +587,32 @@ final class DailyRecapGenerator {
     return draft
   }
 
-  static func makeLocalPrompt(day: String, cards: [TimelineCard]) -> String {
+  static func makeLocalPrompt(
+    day: String,
+    cards: [TimelineCard],
+    mobileNotes: [MobileContextNote] = []
+  ) -> String {
     let cardsText = makeCardsText(day: day, cards: cards)
+    let mobileContextText =
+      mobileNotes.isEmpty
+      ? ""
+      : """
+
+        Supplemental mobile context:
+
+        \(makeMobileContextText(day: day, notes: mobileNotes))
+        """
     let languageSection = makeLocalPromptLanguageSection()
 
     return """
       \(localPrompt)
 
-      You only have timeline cards for this day. The log is incomplete by nature, so prefer omission over guessing.
+      You primarily have timeline cards for this day. Supplemental mobile notes may add links, off-Mac work, calls, or errands. The log is incomplete by nature, so prefer omission over guessing.
 
       Activity log:
 
       \(cardsText)
+      \(mobileContextText)
 
       \(languageSection)
 
@@ -587,6 +626,18 @@ final class DailyRecapGenerator {
       }
 
       Return exactly one JSON object and nothing before or after it.
+      """
+  }
+
+  private static func makeCardsAndMobileContextText(context: DailyRecapGenerationContext) -> String {
+    let cardsText = makeCardsText(day: context.sourceDayString, cards: context.cards)
+    guard !context.mobileNotes.isEmpty else { return cardsText }
+    return """
+      \(cardsText)
+
+      Supplemental mobile context:
+
+      \(makeMobileContextText(day: context.sourceDayString, notes: context.mobileNotes))
       """
   }
 

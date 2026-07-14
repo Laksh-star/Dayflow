@@ -292,12 +292,16 @@ extension DailyView {
       startTs: Int(day.startOfDay.timeIntervalSince1970),
       endTs: Int(day.endOfDay.timeIntervalSince1970)
     )
+    let mobileNotes =
+      MobileContextSettings.includeInExports
+      ? MobileContextService.notes(forDay: day.dayString) : []
     let markdown = MarkdownExportService.dailyMarkdown(
       MarkdownExportService.DailyExportInput(
         day: day,
         standupDraft: standupDraft,
         cards: cards,
-        observations: observations
+        observations: observations,
+        mobileNotes: mobileNotes
       )
     )
     let didSave = MarkdownExportService.saveMarkdown(
@@ -415,7 +419,14 @@ extension DailyView {
           limit: priorStandupHistoryLimit,
           excludingDay: dayString
         ) : []
+      let mobileNotes =
+        MobileContextSettings.includeInDaily
+        ? MobileContextService.notes(forDay: dayString) : []
       let cardsText = DailyRecapGenerator.makeCardsText(day: dayString, cards: cards)
+      let mobileContextText = DailyRecapGenerator.makeMobileContextText(
+        day: dayString,
+        notes: mobileNotes
+      )
       let observationsText =
         usesDayflowInputs
         ? DailyRecapGenerator.makeObservationsText(day: dayString, observations: observations)
@@ -439,8 +450,10 @@ extension DailyView {
             "input_mode": usesDayflowInputs ? "cards_observations_prior" : "cards_only",
             "cards_count": cards.count,
             "observations_count": observations.count,
+            "mobile_context_count": mobileNotes.count,
             "prior_daily_count": priorEntries.count,
             "cards_text_chars": cardsText.count,
+            "mobile_context_text_chars": mobileContextText.count,
             "observations_text_chars": observationsText.count,
             "prior_daily_text_chars": priorDailyText.count,
             "preferences_text_chars": preferencesText.count,
@@ -458,6 +471,7 @@ extension DailyView {
           sourceDayString: dayString,
           cards: cards,
           observations: observations,
+          mobileNotes: mobileNotes,
           priorEntries: priorEntries,
           highlightsTitle: currentHighlightsTitle,
           tasksTitle: currentTasksTitle,

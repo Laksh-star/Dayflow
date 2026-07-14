@@ -49,4 +49,23 @@ final class PrivacyAndProjectRulesTests: XCTestCase {
     let suggestions = ProjectTaggingService.untaggedSuggestions(for: cards, rules: [])
     XCTAssertTrue(suggestions.contains { $0.pattern == "github.com" })
   }
+
+  func testMobileContextNotesMatchFilenameDate() throws {
+    let originalPath = MobileContextSettings.inboxFolderPath
+    let tempFolder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("DayflowMobileContextTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: tempFolder, withIntermediateDirectories: true)
+    defer {
+      MobileContextSettings.inboxFolderPath = originalPath
+      try? FileManager.default.removeItem(at: tempFolder)
+    }
+
+    MobileContextSettings.inboxFolderPath = tempFolder.path
+    let noteURL = tempFolder.appendingPathComponent("2026-07-14-client-call.md")
+    try "# Client call\nCaptured from iPhone.".write(to: noteURL, atomically: true, encoding: .utf8)
+
+    let notes = MobileContextService.notes(forDay: "2026-07-14")
+    XCTAssertEqual(notes.count, 1)
+    XCTAssertEqual(notes.first?.title, "Client call")
+  }
 }

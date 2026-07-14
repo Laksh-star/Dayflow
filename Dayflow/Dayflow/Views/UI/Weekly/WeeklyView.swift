@@ -390,13 +390,17 @@ struct WeeklyView: View {
       from: range.weekStart,
       to: range.weekEnd
     )
+    let mobileNotes =
+      MobileContextSettings.includeInExports
+      ? MobileContextService.notes(from: range.weekStart, through: range.weekEnd) : []
     let markdown = MarkdownExportService.weeklyMarkdown(
       MarkdownExportService.WeeklyExportInput(
         range: range,
         dashboard: dashboardSnapshot,
         cards: cards,
         observations: observations,
-        recordedMinutes: selectedWeekRecordedMinutes
+        recordedMinutes: selectedWeekRecordedMinutes,
+        mobileNotes: mobileNotes
       )
     )
     let didSave = MarkdownExportService.saveMarkdown(

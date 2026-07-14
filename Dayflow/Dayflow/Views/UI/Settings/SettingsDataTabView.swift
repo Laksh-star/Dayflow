@@ -13,6 +13,7 @@ struct SettingsDataTabView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: SettingsStyle.sectionSpacing) {
       exportSection
+      mobileContextSection
       projectTaggingSection
       togglExportSection
       reprocessSection
@@ -109,6 +110,103 @@ struct SettingsDataTabView: View {
           Text(error)
             .font(.custom("Figtree", size: 12))
             .foregroundColor(SettingsStyle.destructive)
+        }
+      }
+    }
+  }
+
+  // MARK: - Mobile context
+
+  private var mobileContextSection: some View {
+    SettingsSection(
+      title: "Mobile context inbox",
+      subtitle: "Import iPhone notes, links, and quick updates into Dayflow exports and standups."
+    ) {
+      VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Inbox folder")
+            .font(.custom("Figtree", size: 11))
+            .fontWeight(.semibold)
+            .textCase(.uppercase)
+            .foregroundColor(SettingsStyle.meta)
+
+          TextField("iCloud Drive folder path", text: $viewModel.mobileContextInboxPath)
+            .font(.custom("Figtree", size: 12))
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+              RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color.black.opacity(0.025))
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(SettingsStyle.divider, lineWidth: 1)
+            )
+            .onChange(of: viewModel.mobileContextInboxPath) { _, _ in
+              viewModel.markMobileContextInboxPathEdited()
+            }
+        }
+
+        HStack(spacing: 10) {
+          SettingsSecondaryButton(
+            title: viewModel.isMobileContextInboxPathSaved ? "Saved" : "Save",
+            isDisabled: viewModel.isMobileContextInboxPathSaved,
+            action: viewModel.saveMobileContextInboxPath
+          )
+
+          SettingsSecondaryButton(
+            title: "Use default",
+            action: viewModel.useDefaultMobileContextInboxPath
+          )
+
+          SettingsSecondaryButton(
+            title: "Create folder",
+            action: viewModel.createMobileContextInboxFolder
+          )
+
+          SettingsSecondaryButton(
+            title: "Open folder",
+            action: viewModel.openMobileContextInboxFolder
+          )
+
+          SettingsSecondaryButton(
+            title: "Refresh",
+            action: viewModel.refreshMobileContextStatus
+          )
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+          Toggle("Include mobile notes in Markdown exports", isOn: $viewModel.mobileContextIncludeInExports)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.text)
+            .toggleStyle(.checkbox)
+
+          Toggle("Include mobile notes in Daily standup generation", isOn: $viewModel.mobileContextIncludeInDaily)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.text)
+            .toggleStyle(.checkbox)
+        }
+
+        Text(
+          "On iPhone, save .md or .txt files here. Files are matched by a yyyy-MM-dd filename or by the file's modified date."
+        )
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(SettingsStyle.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+
+        if let status = viewModel.mobileContextStatusMessage {
+          Text(status)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if let error = viewModel.mobileContextErrorMessage {
+          Text(error)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.destructive)
+            .fixedSize(horizontal: false, vertical: true)
         }
       }
     }

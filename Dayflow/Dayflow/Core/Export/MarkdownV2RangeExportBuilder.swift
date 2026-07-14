@@ -1,7 +1,12 @@
 import Foundation
 
 enum MarkdownV2RangeExportBuilder {
-  static func makeMarkdown(start: Date, end: Date, cardsByDay: [(day: Date, cards: [TimelineCard])])
+  static func makeMarkdown(
+    start: Date,
+    end: Date,
+    cardsByDay: [(day: Date, cards: [TimelineCard])],
+    mobileNotes: [MobileContextNote] = []
+  )
     -> String
   {
     let allCards = cardsByDay.flatMap(\.cards)
@@ -29,6 +34,7 @@ enum MarkdownV2RangeExportBuilder {
 
     appendProjectRollups(rollups, to: &lines)
     appendWeeklyRollupIfNeeded(cardsByDay: cardsByDay, rules: rules, to: &lines)
+    appendMobileContext(mobileNotes, to: &lines)
 
     lines.append("## Daily timeline")
     lines.append("")
@@ -37,6 +43,27 @@ enum MarkdownV2RangeExportBuilder {
     }
 
     return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
+  }
+
+  private static func appendMobileContext(_ notes: [MobileContextNote], to lines: inout [String]) {
+    guard !notes.isEmpty else { return }
+
+    let notesByDay = Dictionary(grouping: notes) { $0.matchedDay }
+    lines.append("## Mobile context")
+    lines.append("")
+
+    for day in notesByDay.keys.sorted() {
+      lines.append("### \(day)")
+      lines.append("")
+      for note in (notesByDay[day] ?? []).sorted(by: { $0.modifiedAt < $1.modifiedAt }) {
+        lines.append("#### \(clean(note.title, fallback: note.url.deletingPathExtension().lastPathComponent))")
+        lines.append("")
+        lines.append("- Source: `\(note.url.lastPathComponent)`")
+        lines.append("")
+        lines.append(note.body)
+        lines.append("")
+      }
+    }
   }
 
   private static func appendProjectRollups(_ rollups: [ProjectTimeRollup], to lines: inout [String]) {

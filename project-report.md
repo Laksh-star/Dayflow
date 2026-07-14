@@ -57,6 +57,7 @@ This file tracks the local development work added on top of the upstream
 - Added timeline Markdown export from Settings.
 - Added Markdown v2 range export with frontmatter, daily sections, tags/categories, and weekly rollup content.
 - Kept the Daily view as the canonical standup workflow with copy, regenerate, and export actions.
+- Added Mobile Context Inbox support so iPhone-created `.md`/`.txt` notes can be included in daily, weekly, and range Markdown exports.
 
 ### OpenAI-compatible API provider
 
@@ -107,6 +108,14 @@ This file tracks the local development work added on top of the upstream
 - Added Settings rollups for today's time by project/client.
 - Added suggested project mappings from untagged observed cards.
 - Removed the duplicate Settings standup composer so the Daily standup surface remains the single user-facing workflow.
+
+### Mobile context inbox
+
+- Added a configurable iCloud Drive folder for iPhone-captured notes, links, calls, errands, and off-Mac context.
+- Added Settings > Export controls to save/use/create/open the inbox folder and toggle inclusion in exports or Daily standup generation.
+- Mobile notes are matched by `yyyy-MM-dd` filenames or file modified date.
+- Daily generation receives mobile notes as supplemental context while timeline cards remain the primary evidence.
+- Added setup documentation in `docs/mobile-context-inbox.md`.
 
 ### Fork account surface
 

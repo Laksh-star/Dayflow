@@ -8,6 +8,7 @@ enum MarkdownExportService {
     let standupDraft: DailyStandupDraft
     let cards: [TimelineCard]
     let observations: [Observation]
+    let mobileNotes: [MobileContextNote]
   }
 
   struct WeeklyExportInput {
@@ -16,6 +17,7 @@ enum MarkdownExportService {
     let cards: [TimelineCard]
     let observations: [Observation]
     let recordedMinutes: Int?
+    let mobileNotes: [MobileContextNote]
   }
 
   static func dailyMarkdown(_ input: DailyExportInput) -> String {
@@ -42,6 +44,7 @@ enum MarkdownExportService {
     lines.append("")
 
     appendStandup(input.standupDraft, to: &lines)
+    appendMobileContext(input.mobileNotes, to: &lines)
     appendCategoryTotals(totals, to: &lines)
     appendTimelineCards(cards, to: &lines)
     appendObservations(observations, to: &lines)
@@ -76,6 +79,7 @@ enum MarkdownExportService {
     lines.append("")
 
     appendWeeklySummary(input.dashboard, to: &lines)
+    appendMobileContext(input.mobileNotes, to: &lines)
     appendCategoryTotals(totals, to: &lines)
     appendTimelineCards(cards, to: &lines)
     appendObservations(observations, to: &lines)
@@ -145,6 +149,21 @@ enum MarkdownExportService {
       items: draft.blockersBody.components(separatedBy: .newlines),
       to: &lines
     )
+  }
+
+  private static func appendMobileContext(_ notes: [MobileContextNote], to lines: inout [String]) {
+    guard !notes.isEmpty else { return }
+
+    lines.append("## Mobile Context")
+    lines.append("")
+    for note in notes.sorted(by: { $0.modifiedAt < $1.modifiedAt }) {
+      lines.append("### \(cleanInline(note.title, fallback: note.url.deletingPathExtension().lastPathComponent))")
+      lines.append("")
+      lines.append("- Day: \(note.matchedDay)")
+      lines.append("- Source: `\(note.url.lastPathComponent)`")
+      lines.append("")
+      appendParagraph(note.body, fallback: nil, to: &lines)
+    }
   }
 
   private static func appendWeeklySummary(_ dashboard: WeeklyDashboardSnapshot, to lines: inout [String]) {
