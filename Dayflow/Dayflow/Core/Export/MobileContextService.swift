@@ -99,16 +99,15 @@ enum MobileContextService {
   private static func notes(forDay dayString: String, dayStart: Date) -> [MobileContextNote] {
     let folderURL = URL(fileURLWithPath: MobileContextSettings.inboxFolderPath, isDirectory: true)
     let fileManager = FileManager.default
-    guard
-      let urls = try? fileManager.contentsOfDirectory(
-        at: folderURL,
-        includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
-        options: [.skipsHiddenFiles]
-      )
-    else {
+    guard let enumerator = fileManager.enumerator(
+      at: folderURL,
+      includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
+      options: [.skipsHiddenFiles]
+    ) else {
       return []
     }
 
+    let urls = enumerator.compactMap { $0 as? URL }
     let calendar = Calendar.current
     let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
 
