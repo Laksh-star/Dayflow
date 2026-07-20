@@ -489,7 +489,7 @@ final class OllamaProvider {
       if duration <= 0 {
         errors.append("Card \(index + 1) has invalid time range: \(card.startTime) - \(card.endTime).")
       }
-      if duration < 5 && index < cards.count - 1 {
+      if duration < 1 && index < cards.count - 1 {
         errors.append(
           "Card \(index + 1) '\(card.title)' is only \(String(format: "%.1f", duration)) minutes; merge short middle cards."
         )

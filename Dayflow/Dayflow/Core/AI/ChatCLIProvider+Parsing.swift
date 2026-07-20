@@ -464,7 +464,7 @@ extension ChatCLIProvider {
         durationMinutes = Double(endSeconds - startSeconds) / 60.0
       }
 
-      if durationMinutes < 5 && index < cards.count - 1 {
+      if durationMinutes < 1 && index < cards.count - 1 {
         let msg = String(
           format: "Card %d '%@' is only %.1f minutes long", index + 1, card.title, durationMinutes)
         return (false, msg)

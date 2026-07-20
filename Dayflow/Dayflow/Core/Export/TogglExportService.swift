@@ -205,7 +205,8 @@ enum TogglExportService {
     rules: [ProjectTaggingRule] = ProjectTaggingService.rules(),
     projectMappings: [TogglProjectMappingRule] = TogglExportSettings.projectMappings()
   ) -> [TogglExportDraftEntry] {
-    cards.compactMap { card in
+    let candidates = cards.compactMap { card -> DraftCandidate? in
+      guard !shouldExcludeFromToggl(card) else { return nil }
       guard let interval = cardInterval(card) else { return nil }
       let sourceProject = ProjectTaggingService.project(for: card, rules: rules) ?? "Untagged"
       let projectID = matchingProjectID(
@@ -213,20 +214,57 @@ enum TogglExportService {
         projects: projects,
         projectMappings: projectMappings
       )
-      let minutes = max(1, Int(interval.end.timeIntervalSince(interval.start) / 60))
-      let description = sourceProject == "Untagged" ? card.title : "\(sourceProject): \(card.title)"
-
-      return TogglExportDraftEntry(
-        id: "\(card.day)-\(card.recordId ?? 0)-\(card.startTimestamp)-\(card.endTimestamp)-\(card.title)",
-        cardRecordId: card.recordId,
-        sourceTitle: card.title,
+      return DraftCandidate(
+        card: card,
         sourceProject: sourceProject,
+        togglProjectId: projectID,
         start: interval.start,
-        end: interval.end,
+        end: interval.end
+      )
+    }
+    .sorted {
+      if $0.start == $1.start { return $0.end < $1.end }
+      return $0.start < $1.start
+    }
+
+    return mergedDraftEntries(from: candidates)
+  }
+
+  private static func mergedDraftEntries(from candidates: [DraftCandidate]) -> [TogglExportDraftEntry] {
+    var groups: [[DraftCandidate]] = []
+
+    for candidate in candidates {
+      guard let previous = groups.last?.last else {
+        groups.append([candidate])
+        continue
+      }
+
+      if shouldMerge(previous: previous, next: candidate) {
+        groups[groups.count - 1].append(candidate)
+      } else {
+        groups.append([candidate])
+      }
+    }
+
+    return groups.map { group in
+      let start = group.map(\.start).min() ?? Date()
+      let end = group.map(\.end).max() ?? start
+      let first = group[0]
+      let title = consolidatedTitle(for: group)
+      let minutes = max(1, Int(end.timeIntervalSince(start) / 60))
+      let description =
+        first.sourceProject == "Untagged" ? title : "\(first.sourceProject): \(title)"
+      return TogglExportDraftEntry(
+        id: togglDraftID(for: group),
+        cardRecordId: group.count == 1 ? first.card.recordId : nil,
+        sourceTitle: title,
+        sourceProject: first.sourceProject,
+        start: start,
+        end: end,
         durationMinutes: minutes,
         isIncluded: true,
         description: description,
-        togglProjectId: projectID,
+        togglProjectId: first.togglProjectId,
         duplicateWarning: nil
       )
     }
@@ -322,6 +360,74 @@ enum TogglExportService {
       == .orderedSame
     let projectsMatch = draft.togglProjectId != nil && draft.togglProjectId == existing.projectID
     return descriptionsMatch || projectsMatch
+  }
+
+  private struct DraftCandidate {
+    let card: TimelineCard
+    let sourceProject: String
+    let togglProjectId: Int64?
+    let start: Date
+    let end: Date
+  }
+
+  private static func shouldExcludeFromToggl(_ card: TimelineCard) -> Bool {
+    if card.category.trimmingCharacters(in: .whitespacesAndNewlines)
+      .localizedCaseInsensitiveCompare("System") == .orderedSame
+    {
+      return true
+    }
+    if card.title.localizedCaseInsensitiveCompare("Processing failed") == .orderedSame {
+      return true
+    }
+    let failureText = [card.summary, card.detailedSummary].joined(separator: " ")
+    return failureText.localizedCaseInsensitiveContains("failed to process")
+  }
+
+  private static func shouldMerge(previous: DraftCandidate, next: DraftCandidate) -> Bool {
+    guard previous.sourceProject == next.sourceProject,
+      previous.togglProjectId == next.togglProjectId
+    else {
+      return false
+    }
+
+    let calendar = Calendar.current
+    guard calendar.isDate(previous.start, inSameDayAs: next.start) else { return false }
+
+    let gap = next.start.timeIntervalSince(previous.end)
+    return gap >= 0 && gap <= 15 * 60
+  }
+
+  private static func consolidatedTitle(for group: [DraftCandidate]) -> String {
+    let titles = group.map(\.card.title)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+      .reduce(into: [String]()) { unique, title in
+        guard !unique.contains(where: { $0.localizedCaseInsensitiveCompare(title) == .orderedSame }) else {
+          return
+        }
+        unique.append(title)
+      }
+
+    guard let first = titles.first else { return "Dayflow activity" }
+    guard titles.count > 1 else { return first }
+
+    let second = titles[1]
+    if titles.count == 2 {
+      return "\(first); \(second)"
+    }
+    return "\(first); \(second) + \(titles.count - 2) more"
+  }
+
+  private static func togglDraftID(for group: [DraftCandidate]) -> String {
+    let first = group[0].card
+    let ids = group.map { candidate in
+      if let recordId = candidate.card.recordId {
+        return String(recordId)
+      }
+      return "\(candidate.card.startTimestamp)-\(candidate.card.endTimestamp)-\(candidate.card.title)"
+    }
+    .joined(separator: "_")
+    return "\(first.day)-\(ids)"
   }
 
   private static func cardInterval(_ card: TimelineCard) -> (start: Date, end: Date)? {
