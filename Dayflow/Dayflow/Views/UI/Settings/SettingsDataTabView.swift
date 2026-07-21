@@ -13,7 +13,11 @@ struct SettingsDataTabView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: SettingsStyle.sectionSpacing) {
       exportSection
+      mobileContextSection
+      projectTaggingSection
+      togglExportSection
       reprocessSection
+      repairSection
     }
   }
 
@@ -82,7 +86,7 @@ struct SettingsDataTabView: View {
 
         HStack(spacing: 12) {
           SettingsPrimaryButton(
-            title: viewModel.isExportingTimelineRange ? "Exporting…" : "Export as Markdown",
+            title: viewModel.isExportingTimelineRange ? "Exporting…" : "Export Markdown v2",
             systemImage: viewModel.isExportingTimelineRange ? nil : "square.and.arrow.down",
             isLoading: viewModel.isExportingTimelineRange,
             isDisabled: rangeInvalid,
@@ -106,6 +110,470 @@ struct SettingsDataTabView: View {
           Text(error)
             .font(.custom("Figtree", size: 12))
             .foregroundColor(SettingsStyle.destructive)
+        }
+      }
+    }
+  }
+
+  // MARK: - Mobile context
+
+  private var mobileContextSection: some View {
+    SettingsSection(
+      title: "Mobile context inbox",
+      subtitle: "Import iPhone notes, links, and quick updates into Dayflow exports and standups."
+    ) {
+      VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Inbox folder")
+            .font(.custom("Figtree", size: 11))
+            .fontWeight(.semibold)
+            .textCase(.uppercase)
+            .foregroundColor(SettingsStyle.meta)
+
+          TextField("iCloud Drive folder path", text: $viewModel.mobileContextInboxPath)
+            .font(.custom("Figtree", size: 12))
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+              RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color.black.opacity(0.025))
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(SettingsStyle.divider, lineWidth: 1)
+            )
+            .onChange(of: viewModel.mobileContextInboxPath) { _, _ in
+              viewModel.markMobileContextInboxPathEdited()
+            }
+        }
+
+        HStack(spacing: 10) {
+          SettingsSecondaryButton(
+            title: viewModel.isMobileContextInboxPathSaved ? "Saved" : "Save",
+            isDisabled: viewModel.isMobileContextInboxPathSaved,
+            action: viewModel.saveMobileContextInboxPath
+          )
+
+          SettingsSecondaryButton(
+            title: "Use default",
+            action: viewModel.useDefaultMobileContextInboxPath
+          )
+
+          SettingsSecondaryButton(
+            title: "Create folder",
+            action: viewModel.createMobileContextInboxFolder
+          )
+
+          SettingsSecondaryButton(
+            title: "Open folder",
+            action: viewModel.openMobileContextInboxFolder
+          )
+
+          SettingsSecondaryButton(
+            title: "Refresh",
+            action: viewModel.refreshMobileContextStatus
+          )
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+          Toggle("Include mobile notes in Markdown exports", isOn: $viewModel.mobileContextIncludeInExports)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.text)
+            .toggleStyle(.checkbox)
+
+          Toggle("Include mobile notes in Daily standup generation", isOn: $viewModel.mobileContextIncludeInDaily)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.text)
+            .toggleStyle(.checkbox)
+        }
+
+        Text(
+          "On iPhone, save .md or .txt files here. Files are matched by a yyyy-MM-dd filename or by the file's modified date."
+        )
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(SettingsStyle.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+
+        if let status = viewModel.mobileContextStatusMessage {
+          Text(status)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if let error = viewModel.mobileContextErrorMessage {
+          Text(error)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.destructive)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+    }
+  }
+
+  // MARK: - Toggl export
+
+  private var togglExportSection: some View {
+    let selectedCount = viewModel.togglDraftEntries.filter(\.isIncluded).count
+    let duplicateCount = viewModel.togglDraftEntries.filter { $0.duplicateWarning != nil }.count
+
+    return SettingsSection(
+      title: "Toggl export",
+      subtitle: "Map local Dayflow tags to real Toggl workspace projects, then review entries before submitting."
+    ) {
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(alignment: .top, spacing: 12) {
+          togglTextField(
+            title: "API token",
+            placeholder: "Toggl API token",
+            text: $viewModel.togglAPITokenText,
+            width: 260
+          )
+          .onChange(of: viewModel.togglAPITokenText) { _, _ in
+            viewModel.markTogglSettingsEdited()
+          }
+
+          togglTextField(
+            title: "Workspace ID",
+            placeholder: "1234567",
+            text: $viewModel.togglWorkspaceIDText,
+            width: 150
+          )
+          .onChange(of: viewModel.togglWorkspaceIDText) { _, _ in
+            viewModel.markTogglSettingsEdited()
+          }
+
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Actions")
+              .font(.custom("Figtree", size: 11))
+              .fontWeight(.semibold)
+              .textCase(.uppercase)
+              .foregroundColor(SettingsStyle.meta)
+
+            HStack(spacing: 8) {
+              SettingsSecondaryButton(
+                title: viewModel.isTogglSettingsSaved ? "Saved" : "Save",
+                isDisabled: viewModel.isTogglSettingsSaved,
+                action: viewModel.saveTogglSettings
+              )
+
+              SettingsSecondaryButton(
+                title: viewModel.isLoadingTogglProjects ? "Loading..." : "Load projects",
+                isDisabled: viewModel.isLoadingTogglProjects,
+                action: viewModel.loadTogglProjects
+              )
+            }
+          }
+        }
+
+        HStack(spacing: 12) {
+          SettingsSecondaryButton(
+            title: viewModel.isPreparingTogglDraft ? "Preparing..." : "Prepare draft from range",
+            isDisabled: viewModel.isPreparingTogglDraft,
+            action: viewModel.prepareTogglDraft
+          )
+
+          SettingsPrimaryButton(
+            title: viewModel.isSubmittingTogglEntries ? "Submitting..." : "Submit selected",
+            systemImage: viewModel.isSubmittingTogglEntries ? nil : "paperplane",
+            isLoading: viewModel.isSubmittingTogglEntries,
+            isDisabled: selectedCount == 0,
+            action: { viewModel.showSubmitTogglConfirm = true }
+          )
+
+          SettingsMetadata(
+            text:
+              "\(viewModel.togglProjects.count) Toggl projects • \(selectedCount) selected • \(duplicateCount) possible duplicates"
+          )
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(spacing: 12) {
+            Text("Project mappings")
+              .font(.custom("Figtree", size: 13))
+              .fontWeight(.semibold)
+              .foregroundColor(SettingsStyle.text)
+
+            SettingsSecondaryButton(
+              title: viewModel.isTogglProjectMappingsSaved ? "Mappings saved" : "Save mappings",
+              isDisabled: viewModel.isTogglProjectMappingsSaved,
+              action: viewModel.saveTogglProjectMappings
+            )
+
+            Text("Format: Dayflow tag=Toggl project")
+              .font(.custom("Figtree", size: 12))
+              .foregroundColor(SettingsStyle.meta)
+          }
+
+          TextEditor(text: $viewModel.togglProjectMappingsText)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.text)
+            .scrollContentBackground(.hidden)
+            .padding(8)
+            .frame(minHeight: 70, maxHeight: 100)
+            .background(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.black.opacity(0.025))
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(SettingsStyle.divider, lineWidth: 1)
+            )
+            .onChange(of: viewModel.togglProjectMappingsText) { _, _ in
+              viewModel.markTogglProjectMappingsEdited()
+            }
+        }
+
+        if !viewModel.togglDraftEntries.isEmpty {
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Draft entries")
+              .font(.custom("Figtree", size: 13))
+              .fontWeight(.semibold)
+              .foregroundColor(SettingsStyle.text)
+
+            ForEach($viewModel.togglDraftEntries) { $entry in
+              togglDraftRow(entry: $entry)
+            }
+          }
+        } else {
+          Text("Prepare a draft to review editable Toggl entries for the selected export date range.")
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if let status = viewModel.togglStatusMessage {
+          Text(status)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if let error = viewModel.togglErrorMessage {
+          Text(error)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.destructive)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      .alert("Submit Toggl entries?", isPresented: $viewModel.showSubmitTogglConfirm) {
+        Button("Cancel", role: .cancel) {}
+        Button("Submit") { viewModel.submitSelectedTogglEntries() }
+      } message: {
+        Text(
+          "This will create \(selectedCount) time entr\(selectedCount == 1 ? "y" : "ies") in Toggl for the selected draft rows."
+        )
+      }
+    }
+  }
+
+  private func togglTextField(
+    title: String,
+    placeholder: String,
+    text: Binding<String>,
+    width: CGFloat
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(title)
+        .font(.custom("Figtree", size: 11))
+        .fontWeight(.semibold)
+        .textCase(.uppercase)
+        .foregroundColor(SettingsStyle.meta)
+
+      TextField(placeholder, text: text)
+        .font(.custom("Figtree", size: 12))
+        .textFieldStyle(.plain)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(width: width)
+        .background(
+          RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .fill(Color.black.opacity(0.025))
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .stroke(SettingsStyle.divider, lineWidth: 1)
+        )
+    }
+  }
+
+  private func togglDraftRow(entry: Binding<TogglExportDraftEntry>) -> some View {
+    HStack(alignment: .top, spacing: 10) {
+      Toggle("", isOn: entry.isIncluded)
+        .toggleStyle(.checkbox)
+        .labelsHidden()
+        .padding(.top, 7)
+
+      VStack(alignment: .leading, spacing: 7) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+          Text(entry.wrappedValue.sourceProject)
+            .font(.custom("Figtree", size: 12))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.text)
+          Text(
+            "\(Self.togglTimeFormatter.string(from: entry.wrappedValue.start))-\(Self.togglTimeFormatter.string(from: entry.wrappedValue.end)) • \(entry.wrappedValue.durationMinutes) min"
+          )
+          .font(.custom("Figtree", size: 11))
+          .foregroundColor(SettingsStyle.meta)
+        }
+
+        TextField("Description", text: entry.description)
+          .font(.custom("Figtree", size: 12))
+          .textFieldStyle(.plain)
+          .padding(.horizontal, 9)
+          .padding(.vertical, 7)
+          .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+              .fill(Color.black.opacity(0.025))
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+              .stroke(SettingsStyle.divider, lineWidth: 1)
+          )
+
+        HStack(spacing: 8) {
+          Picker("Toggl project", selection: entry.togglProjectId) {
+            Text("No Toggl project").tag(Int64?.none)
+            ForEach(viewModel.togglProjects) { project in
+              Text(project.clientName.map { "\($0) / \(project.name)" } ?? project.name)
+                .tag(Int64?.some(project.id))
+            }
+          }
+          .pickerStyle(.menu)
+          .labelsHidden()
+          .frame(width: 260, alignment: .leading)
+
+          Text(entry.wrappedValue.sourceTitle)
+            .font(.custom("Figtree", size: 11))
+            .foregroundColor(SettingsStyle.meta)
+            .lineLimit(1)
+        }
+
+        if let duplicateWarning = entry.wrappedValue.duplicateWarning {
+          Text(duplicateWarning)
+            .font(.custom("Figtree", size: 11))
+            .foregroundColor(SettingsStyle.destructive)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+    }
+    .padding(.vertical, 8)
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(SettingsStyle.divider)
+        .frame(height: 1)
+    }
+  }
+
+  // MARK: - Project tagging
+
+  private var projectTaggingSection: some View {
+    SettingsSection(
+      title: "Dayflow project tagging",
+      subtitle: "Map domains, app names, file names, and card text to local Dayflow tags. These are not Toggl projects until you map them below."
+    ) {
+      VStack(alignment: .leading, spacing: 12) {
+        TextEditor(text: $viewModel.projectRulesText)
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.text)
+          .scrollContentBackground(.hidden)
+          .padding(8)
+          .frame(minHeight: 92, maxHeight: 130)
+          .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .fill(Color.black.opacity(0.025))
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .stroke(SettingsStyle.divider, lineWidth: 1)
+          )
+          .onChange(of: viewModel.projectRulesText) { _, _ in
+            viewModel.markProjectRulesEdited()
+          }
+
+        HStack(spacing: 12) {
+          SettingsSecondaryButton(
+            title: viewModel.isProjectRulesSaved ? "Saved" : "Save rules",
+            isDisabled: viewModel.isProjectRulesSaved,
+            action: viewModel.saveProjectRules
+          )
+
+          SettingsSecondaryButton(
+            title: "Refresh rollups",
+            action: viewModel.refreshProjectRollups
+          )
+
+          Text("Format: Dayflow tag=keyword,domain,app")
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.meta)
+        }
+
+        projectRollupsView
+      }
+    }
+  }
+
+  private var projectRollupsView: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      if let message = viewModel.projectRollupStatusMessage {
+        Text(message)
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.secondary)
+      }
+
+      if !viewModel.projectRollups.isEmpty {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Today by Dayflow tag")
+            .font(.custom("Figtree", size: 13))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.text)
+
+          ForEach(viewModel.projectRollups.prefix(8)) { rollup in
+            HStack(spacing: 10) {
+              Text(rollup.project)
+                .font(.custom("Figtree", size: 12))
+                .fontWeight(.semibold)
+                .foregroundColor(SettingsStyle.text)
+                .frame(width: 150, alignment: .leading)
+              Text("\(rollup.minutes) min")
+                .font(.custom("Figtree", size: 12))
+                .foregroundColor(SettingsStyle.secondary)
+                .frame(width: 70, alignment: .leading)
+              Text("\(rollup.cardCount) card\(rollup.cardCount == 1 ? "" : "s")")
+                .font(.custom("Figtree", size: 12))
+                .foregroundColor(SettingsStyle.meta)
+              Spacer()
+            }
+          }
+        }
+      }
+
+      if !viewModel.projectRuleSuggestions.isEmpty {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Suggested Dayflow tag mappings")
+            .font(.custom("Figtree", size: 13))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.text)
+
+          ForEach(viewModel.projectRuleSuggestions.prefix(6)) { suggestion in
+            HStack(spacing: 10) {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(suggestion.pattern)
+                  .font(.custom("Figtree", size: 12))
+                  .fontWeight(.semibold)
+                  .foregroundColor(SettingsStyle.text)
+                Text("\(suggestion.source) • \(suggestion.minutes) min • \(suggestion.cardTitle)")
+                  .font(.custom("Figtree", size: 11))
+                  .foregroundColor(SettingsStyle.meta)
+                  .lineLimit(1)
+              }
+              Spacer()
+              SettingsSecondaryButton(title: "Add") {
+                viewModel.addProjectRuleSuggestion(suggestion)
+              }
+            }
+          }
         }
       }
     }
@@ -144,6 +612,7 @@ struct SettingsDataTabView: View {
               withAnimation(.easeOut(duration: 0.2)) {
                 isReprocessDatePickerExpanded = false
               }
+              viewModel.refreshRepairSummary()
             }
           )
           .transition(.move(edge: .top).combined(with: .opacity))
@@ -196,6 +665,175 @@ struct SettingsDataTabView: View {
           "This will delete existing timeline cards for \(dayString) and re-run analysis. It can consume many API calls."
         )
       }
+    }
+  }
+
+  // MARK: - Repair failed batches
+
+  private var repairSection: some View {
+    let normalizedDate = timelineDisplayDate(from: viewModel.reprocessDayDate)
+    let dayString = DateFormatter.yyyyMMdd.string(from: normalizedDate)
+    let summary = viewModel.repairSummary
+    let failedCount = summary?.failedBatchCount ?? 0
+    let retryableCount = summary?.retryableBatchIds.count ?? 0
+    let duplicateCount = summary?.duplicateFailedCardCount ?? 0
+
+    return SettingsSection(
+      title: "Repair failed batches",
+      subtitle: "Clean up duplicate failure cards and retry only failed batches."
+    ) {
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+          Text(dayString)
+            .font(.custom("Figtree", size: 12))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.text)
+
+          SettingsMetadata(
+            text:
+              "\(failedCount) failed • \(retryableCount) retryable • \(duplicateCount) duplicate"
+          )
+
+          Spacer()
+
+          SettingsSecondaryButton(
+            title: viewModel.isRefreshingRepairSummary ? "Refreshing..." : "Refresh",
+            isDisabled: viewModel.isRefreshingRepairSummary,
+            action: viewModel.refreshRepairSummary
+          )
+        }
+
+        if let summary, summary.items.isEmpty {
+          Text("No failed timeline batches found for this day.")
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+        } else if let summary {
+          VStack(alignment: .leading, spacing: 8) {
+            ForEach(summary.items.prefix(6)) { item in
+              failedBatchRow(item)
+            }
+
+            if summary.items.count > 6 {
+              SettingsMetadata(text: "+ \(summary.items.count - 6) more")
+            }
+          }
+        } else {
+          Text("Refresh to inspect failed batches for this day.")
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Retry provider")
+            .font(.custom("Figtree", size: 11))
+            .fontWeight(.semibold)
+            .textCase(.uppercase)
+            .foregroundColor(SettingsStyle.meta)
+
+          HStack(spacing: 10) {
+            Picker("Retry provider", selection: $viewModel.repairProviderOverrideId) {
+              Text("Current provider").tag("current")
+              Text("API").tag(OpenAICompatibleProviderSettings.providerID)
+              Text("Gemini").tag(LLMProviderID.gemini.rawValue)
+              Text("ChatGPT CLI").tag("chatgpt_codex")
+              Text("Claude CLI").tag("chatgpt_claude")
+              Text("Local").tag(LLMProviderID.ollama.rawValue)
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(width: 180, alignment: .leading)
+            .disabled(viewModel.isRetryingFailedBatches)
+
+            if viewModel.repairProviderOverrideSupportsModel {
+              TextField("Model override", text: $viewModel.repairModelOverrideText)
+                .font(.custom("Figtree", size: 12))
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                  RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.black.opacity(0.025))
+                )
+                .overlay(
+                  RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(SettingsStyle.divider, lineWidth: 1)
+                )
+                .frame(width: 260)
+                .disabled(viewModel.isRetryingFailedBatches)
+            }
+          }
+
+          Text(
+            "Only repair retries use this override. Leave the model blank to use the saved provider default."
+          )
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.meta)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+
+        HStack(spacing: 12) {
+          SettingsSecondaryButton(
+            title: viewModel.isDedupingFailedCards ? "Deduping..." : "Dedupe failed cards",
+            isDisabled: viewModel.isDedupingFailedCards || duplicateCount == 0,
+            action: viewModel.dedupeFailedCardsForSelectedDay
+          )
+
+          SettingsPrimaryButton(
+            title: viewModel.isRetryingFailedBatches ? "Retrying..." : "Retry failed batches",
+            systemImage: viewModel.isRetryingFailedBatches ? nil : "arrow.clockwise",
+            isLoading: viewModel.isRetryingFailedBatches,
+            isDisabled: retryableCount == 0,
+            action: { viewModel.showRetryFailedBatchesConfirm = true }
+          )
+        }
+
+        if let status = viewModel.repairStatusMessage {
+          Text(status)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if let error = viewModel.repairErrorMessage {
+          Text(error)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.destructive)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      .alert("Retry failed batches?", isPresented: $viewModel.showRetryFailedBatchesConfirm) {
+        Button("Cancel", role: .cancel) {}
+        Button("Retry", role: .destructive) { viewModel.retryFailedBatchesForSelectedDay() }
+      } message: {
+        Text(
+          "This will re-run \(retryableCount) failed batch\(retryableCount == 1 ? "" : "es") for \(dayString). It may consume API calls."
+        )
+      }
+    }
+  }
+
+  private func failedBatchRow(_ item: FailedBatchRepairItem) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 10) {
+      Text("#\(item.batchId)")
+        .font(.custom("Figtree", size: 12))
+        .fontWeight(.semibold)
+        .foregroundColor(SettingsStyle.text)
+        .frame(width: 72, alignment: .leading)
+
+      Text(item.batchStatus)
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(SettingsStyle.secondary)
+        .frame(width: 82, alignment: .leading)
+
+      Text("\(item.failedCardCount) failed card\(item.failedCardCount == 1 ? "" : "s")")
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(SettingsStyle.secondary)
+
+      Text("\(item.screenshotCount) screenshots")
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(item.isRetryable ? SettingsStyle.statusGood : SettingsStyle.destructive)
+
+      Spacer()
     }
   }
 
@@ -281,6 +919,12 @@ struct SettingsDataTabView: View {
   private static let dateLabelFormatter: DateFormatter = {
     let formatter = DateFormatter()
     formatter.setLocalizedDateFormatFromTemplate("MMM d, yyyy")
+    return formatter
+  }()
+
+  private static let togglTimeFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "MMM d, h:mm a"
     return formatter
   }()
 }

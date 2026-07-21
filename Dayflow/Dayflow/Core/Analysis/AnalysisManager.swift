@@ -21,8 +21,16 @@ protocol AnalysisManaging {
   func reprocessSpecificBatches(
     _ batchIds: [Int64], progressHandler: @escaping (String) -> Void,
     completion: @escaping (Result<Void, Error>) -> Void)
+  func reprocessSpecificBatches(
+    _ batchIds: [Int64], override: LLMProcessingOverride?,
+    progressHandler: @escaping (String) -> Void,
+    completion: @escaping (Result<Void, Error>) -> Void)
   func reprocessBatch(
     _ batchId: Int64, stepHandler: @escaping (LLMProcessingStep) -> Void,
+    completion: @escaping (Result<Void, Error>) -> Void)
+  func reprocessBatch(
+    _ batchId: Int64, override: LLMProcessingOverride?,
+    stepHandler: @escaping (LLMProcessingStep) -> Void,
     completion: @escaping (Result<Void, Error>) -> Void)
 }
 
@@ -212,6 +220,20 @@ final class AnalysisManager: AnalysisManaging {
     _ batchIds: [Int64], progressHandler: @escaping (String) -> Void,
     completion: @escaping (Result<Void, Error>) -> Void
   ) {
+    reprocessSpecificBatches(
+      batchIds,
+      override: nil,
+      progressHandler: progressHandler,
+      completion: completion
+    )
+  }
+
+  func reprocessSpecificBatches(
+    _ batchIds: [Int64],
+    override: LLMProcessingOverride?,
+    progressHandler: @escaping (String) -> Void,
+    completion: @escaping (Result<Void, Error>) -> Void
+  ) {
     queue.async { [weak self] in
       guard let self = self else {
         completion(
@@ -278,7 +300,7 @@ final class AnalysisManager: AnalysisManaging {
           )
         }
 
-        self.queueLLMRequest(batchId: batchId)
+        self.queueLLMRequest(batchId: batchId, override: override)
 
         // Wait for batch to complete (check status periodically)
         var isCompleted = false
@@ -343,6 +365,15 @@ final class AnalysisManager: AnalysisManaging {
     _ batchId: Int64, stepHandler: @escaping (LLMProcessingStep) -> Void,
     completion: @escaping (Result<Void, Error>) -> Void
   ) {
+    reprocessBatch(batchId, override: nil, stepHandler: stepHandler, completion: completion)
+  }
+
+  func reprocessBatch(
+    _ batchId: Int64,
+    override: LLMProcessingOverride?,
+    stepHandler: @escaping (LLMProcessingStep) -> Void,
+    completion: @escaping (Result<Void, Error>) -> Void
+  ) {
     queue.async { [weak self] in
       guard let self = self else {
         DispatchQueue.main.async {
@@ -371,6 +402,7 @@ final class AnalysisManager: AnalysisManaging {
 
       self.queueLLMRequest(
         batchId: batchId,
+        override: override,
         progressHandler: stepHandler,
         completion: { result in
           DispatchQueue.main.async {
@@ -400,6 +432,7 @@ final class AnalysisManager: AnalysisManaging {
 
   private func queueLLMRequest(
     batchId: Int64,
+    override: LLMProcessingOverride? = nil,
     progressHandler: ((LLMProcessingStep) -> Void)? = nil,
     completion: ((Result<Void, Error>) -> Void)? = nil
   ) {
@@ -473,7 +506,7 @@ final class AnalysisManager: AnalysisManaging {
 
     updateBatchStatus(batchId: batchId, status: "processing")
 
-    llmService.processBatch(batchId, progressHandler: progressHandler) {
+    llmService.processBatch(batchId, override: override, progressHandler: progressHandler) {
       [weak self] (result: Result<ProcessedBatchResult, Error>) in
       guard let self else { return }
 

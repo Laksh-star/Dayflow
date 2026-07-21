@@ -12,7 +12,7 @@ import Foundation
 
 // MARK: - Core Types
 
-enum ChatCLITool: String, Codable {
+enum ChatCLITool: String, Codable, Sendable {
   case codex
   case claude
 }

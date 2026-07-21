@@ -161,8 +161,15 @@ final class DailyRecapScheduler: @unchecked Sendable {
         limit: priorStandupHistoryLimit,
         excludingDay: sourceDayString
       ) : []
+    let mobileNotes =
+      MobileContextSettings.includeInDaily
+      ? MobileContextService.notes(forDay: sourceDayString) : []
 
     let cardsText = DailyRecapGenerator.makeCardsText(day: sourceDayString, cards: cards)
+    let mobileContextText = DailyRecapGenerator.makeMobileContextText(
+      day: sourceDayString,
+      notes: mobileNotes
+    )
     let observationsText =
       usesDayflowInputs
       ? DailyRecapGenerator.makeObservationsText(day: sourceDayString, observations: observations)
@@ -197,8 +204,10 @@ final class DailyRecapScheduler: @unchecked Sendable {
           "input_mode": usesDayflowInputs ? "cards_observations_prior" : "cards_only",
           "cards_count": cards.count,
           "observations_count": observations.count,
+          "mobile_context_count": mobileNotes.count,
           "prior_daily_count": priorEntries.count,
           "cards_text_chars": cardsText.count,
+          "mobile_context_text_chars": mobileContextText.count,
           "observations_text_chars": observationsText.count,
           "prior_daily_text_chars": priorDailyText.count,
           "preferences_text_chars": preferencesText.count,
@@ -213,6 +222,7 @@ final class DailyRecapScheduler: @unchecked Sendable {
         sourceDayString: sourceDayString,
         cards: cards,
         observations: observations,
+        mobileNotes: mobileNotes,
         priorEntries: priorEntries,
         highlightsTitle: "Yesterday's highlights",
         tasksTitle: "Today's tasks",

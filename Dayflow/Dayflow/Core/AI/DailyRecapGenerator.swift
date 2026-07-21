@@ -5,6 +5,7 @@ struct DailyRecapGenerationContext: Sendable {
   let sourceDayString: String
   let cards: [TimelineCard]
   let observations: [Observation]
+  let mobileNotes: [MobileContextNote]
   let priorEntries: [DailyStandupEntry]
   let highlightsTitle: String
   let tasksTitle: String
@@ -154,6 +155,8 @@ final class DailyRecapGenerator {
     let claudeInstalled = LoginShellRunner.isInstalled("claude")
     let isLocalConfigured = localProviderIsConfigured()
     let localModel = DailyRecapProvider.local.modelOrTool
+    let isAPIConfigured = openAICompatibleProviderIsConfigured()
+    let apiModel = DailyRecapProvider.api.modelOrTool
 
     return [
       .dayflow: DailyRecapProviderAvailability(
@@ -165,6 +168,12 @@ final class DailyRecapGenerator {
         detail: isLocalConfigured
           ? (localModel ?? DailyRecapProvider.local.pickerSubtitle)
           : "Configure Ollama or LM Studio before using this provider"
+      ),
+      .api: DailyRecapProviderAvailability(
+        isAvailable: isAPIConfigured,
+        detail: isAPIConfigured
+          ? (apiModel ?? DailyRecapProvider.api.pickerSubtitle)
+          : "Configure an OpenAI-compatible API key before using this provider"
       ),
       .gemini: DailyRecapProviderAvailability(
         isAvailable: !geminiKey.isEmpty,
@@ -207,6 +216,8 @@ final class DailyRecapGenerator {
       return try await generateWithDayflow(context: context, metadata: metadata)
     case .local:
       return try await generateWithLocal(context: context, metadata: metadata)
+    case .api:
+      return try await generateWithOpenAICompatible(context: context, metadata: metadata)
     case .gemini:
       return try await generateWithGemini(context: context, metadata: metadata)
     case .chatgpt:
@@ -281,6 +292,10 @@ final class DailyRecapGenerator {
     .joined(separator: "\n\n")
   }
 
+  static func makeMobileContextText(day: String, notes: [MobileContextNote]) -> String {
+    MobileContextService.makeNotesText(day: day, notes: notes)
+  }
+
   static func makePreferencesText(
     highlightsTitle: String,
     tasksTitle: String,
@@ -315,7 +330,7 @@ final class DailyRecapGenerator {
 
     let request = DayflowDailyGenerationRequest(
       day: context.sourceDayString,
-      cardsText: Self.makeCardsText(day: context.sourceDayString, cards: context.cards),
+      cardsText: Self.makeCardsAndMobileContextText(context: context),
       observationsText: Self.makeObservationsText(
         day: context.sourceDayString,
         observations: context.observations
@@ -366,7 +381,11 @@ final class DailyRecapGenerator {
       apiKey: apiKey,
       preference: GeminiModelPreference(primary: .flash35)
     )
-    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let prompt = Self.makeLocalPrompt(
+      day: context.sourceDayString,
+      cards: context.cards,
+      mobileNotes: context.mobileNotes
+    )
     let (rawText, _) = try await provider.generateText(
       prompt: prompt,
       maxOutputTokens: Self.localRecapMaxOutputTokens
@@ -383,7 +402,33 @@ final class DailyRecapGenerator {
       throw DailyRecapGeneratorError.missingLocalConfiguration
     }
 
-    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let prompt = Self.makeLocalPrompt(
+      day: context.sourceDayString,
+      cards: context.cards,
+      mobileNotes: context.mobileNotes
+    )
+    let (rawText, _) = try await provider.generateText(
+      prompt: prompt,
+      maxTokens: Self.localRecapMaxOutputTokens
+    )
+    let parsed = try Self.parseLocalResponse(rawText)
+    return try makeDraft(from: parsed, context: context, metadata: metadata)
+  }
+
+  private func generateWithOpenAICompatible(
+    context: DailyRecapGenerationContext,
+    metadata: DailyStandupGenerationMetadata
+  ) async throws -> DailyStandupDraft {
+    guard openAICompatibleProviderIsConfigured(), let provider = makeOpenAICompatibleProvider()
+    else {
+      throw DailyRecapGeneratorError.missingLocalConfiguration
+    }
+
+    let prompt = Self.makeLocalPrompt(
+      day: context.sourceDayString,
+      cards: context.cards,
+      mobileNotes: context.mobileNotes
+    )
     let (rawText, _) = try await provider.generateText(
       prompt: prompt,
       maxTokens: Self.localRecapMaxOutputTokens
@@ -401,7 +446,11 @@ final class DailyRecapGenerator {
     }
 
     let provider = ChatCLIProvider(tool: .codex)
-    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let prompt = Self.makeLocalPrompt(
+      day: context.sourceDayString,
+      cards: context.cards,
+      mobileNotes: context.mobileNotes
+    )
     let (rawText, _) = try await provider.generateText(
       prompt: prompt,
       model: "gpt-5.4",
@@ -421,7 +470,11 @@ final class DailyRecapGenerator {
     }
 
     let provider = ChatCLIProvider(tool: .claude)
-    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let prompt = Self.makeLocalPrompt(
+      day: context.sourceDayString,
+      cards: context.cards,
+      mobileNotes: context.mobileNotes
+    )
     let (rawText, _) = try await provider.generateText(
       prompt: prompt,
       model: "opus",
@@ -460,6 +513,21 @@ final class DailyRecapGenerator {
     return OllamaProvider(endpoint: resolvedEndpoint)
   }
 
+  private func makeOpenAICompatibleProvider() -> OllamaProvider? {
+    let endpoint = OpenAICompatibleProviderSettings.loadBaseURL()
+    let apiKey = OpenAICompatibleProviderSettings.loadAPIKey()
+    let requiresAPIKey = OpenAICompatibleProviderSettings.loadAuthMode() != .none
+    guard !requiresAPIKey || !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      return nil
+    }
+    let configuration = OllamaProvider.RuntimeConfiguration.openAICompatible(
+      modelId: OpenAICompatibleProviderSettings.loadModelID(),
+      apiKey: apiKey,
+      baseURL: endpoint
+    )
+    return OllamaProvider(endpoint: endpoint, runtimeConfiguration: configuration)
+  }
+
   private func localProviderIsConfigured() -> Bool {
     let defaults = UserDefaults.standard
     if defaults.bool(forKey: "ollamaSetupComplete") {
@@ -473,6 +541,17 @@ final class DailyRecapGenerator {
       defaults.string(forKey: "llmLocalModelId")?
       .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     return !baseURL.isEmpty && !modelId.isEmpty
+  }
+
+  private func openAICompatibleProviderIsConfigured() -> Bool {
+    let baseURL = OpenAICompatibleProviderSettings.loadBaseURL()
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let modelId = OpenAICompatibleProviderSettings.loadModelID()
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let authReady =
+      OpenAICompatibleProviderSettings.loadAuthMode() == .none
+      || OpenAICompatibleProviderSettings.hasAPIKey()
+    return !baseURL.isEmpty && !modelId.isEmpty && authReady
   }
 
   private func resolvedDayflowEndpoint() -> String? {
@@ -508,18 +587,32 @@ final class DailyRecapGenerator {
     return draft
   }
 
-  static func makeLocalPrompt(day: String, cards: [TimelineCard]) -> String {
+  static func makeLocalPrompt(
+    day: String,
+    cards: [TimelineCard],
+    mobileNotes: [MobileContextNote] = []
+  ) -> String {
     let cardsText = makeCardsText(day: day, cards: cards)
+    let mobileContextText =
+      mobileNotes.isEmpty
+      ? ""
+      : """
+
+        Supplemental mobile context:
+
+        \(makeMobileContextText(day: day, notes: mobileNotes))
+        """
     let languageSection = makeLocalPromptLanguageSection()
 
     return """
       \(localPrompt)
 
-      You only have timeline cards for this day. The log is incomplete by nature, so prefer omission over guessing.
+      You primarily have timeline cards for this day. Supplemental mobile notes may add links, off-Mac work, calls, or errands. The log is incomplete by nature, so prefer omission over guessing.
 
       Activity log:
 
       \(cardsText)
+      \(mobileContextText)
 
       \(languageSection)
 
@@ -533,6 +626,18 @@ final class DailyRecapGenerator {
       }
 
       Return exactly one JSON object and nothing before or after it.
+      """
+  }
+
+  private static func makeCardsAndMobileContextText(context: DailyRecapGenerationContext) -> String {
+    let cardsText = makeCardsText(day: context.sourceDayString, cards: context.cards)
+    guard !context.mobileNotes.isEmpty else { return cardsText }
+    return """
+      \(cardsText)
+
+      Supplemental mobile context:
+
+      \(makeMobileContextText(day: context.sourceDayString, notes: context.mobileNotes))
       """
   }
 

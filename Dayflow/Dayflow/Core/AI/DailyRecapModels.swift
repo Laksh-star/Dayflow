@@ -3,6 +3,7 @@ import Foundation
 enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
   case dayflow
   case local
+  case api
   case gemini
   case chatgpt
   case claude
@@ -14,6 +15,7 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
     .claude,
     .chatgpt,
     .gemini,
+    .api,
     .local,
     .none,
   ]
@@ -47,6 +49,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
     case .chatGPTClaude:
       let preferredTool = defaults.string(forKey: "chatCLIPreferredTool") ?? "codex"
       return preferredTool == "claude" ? .claude : .chatgpt
+    case .openAICompatible:
+      return .api
     case .ollamaLocal:
       return .local
     }
@@ -62,6 +66,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
       return "Dayflow backend"
     case .local:
       return "Local"
+    case .api:
+      return "API"
     case .gemini:
       return "Gemini"
     case .chatgpt:
@@ -79,6 +85,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
       return "Dayflow backend"
     case .local:
       return "Local"
+    case .api:
+      return "API"
     case .gemini:
       return "Gemini 3.5 Flash"
     case .chatgpt:
@@ -96,6 +104,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
       return "Uses Dayflow's hosted service for best performance."
     case .local:
       return "Uses Ollama, LM Studio, or another local-compatible server on this Mac."
+    case .api:
+      return "Uses your OpenAI-compatible API provider."
     case .gemini:
       return "Gemini 3.5 Flash"
     case .chatgpt:
@@ -113,6 +123,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
       return "dayflow_backend"
     case .local:
       return "local_llm"
+    case .api:
+      return "openai_compatible"
     case .gemini:
       return "gemini_direct"
     case .chatgpt, .claude:
@@ -128,6 +140,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
       return nil
     case .local:
       return Self.currentLocalModelID()
+    case .api:
+      return OpenAICompatibleProviderSettings.loadModelID()
     case .gemini:
       return GeminiModel.flash35.rawValue
     case .chatgpt:
@@ -202,6 +216,8 @@ struct DailyStandupGenerationMetadata: Codable, Equatable, Sendable {
       return "Dayflow backend"
     case .local:
       return modelOrTool ?? "Local"
+    case .api:
+      return modelOrTool ?? "API"
     case .gemini:
       return "Gemini 3.5 Flash"
     case .chatgpt:

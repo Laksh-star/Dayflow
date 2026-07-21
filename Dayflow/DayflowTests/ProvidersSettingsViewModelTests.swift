@@ -58,4 +58,28 @@ final class ProvidersSettingsViewModelTests: XCTestCase {
     XCTAssertEqual(viewModel.localModelId, "gemma-4-local")
     XCTAssertEqual(viewModel.localAPIKey, "local-test-key")
   }
+
+  func testOpenAICompatibleProfileDefaultsCanConfigureLocalProxyWithoutAuth() {
+    let defaults = UserDefaults(suiteName: "DayflowTests.OpenAICompatibleProfile")!
+    defaults.removePersistentDomain(forName: "DayflowTests.OpenAICompatibleProfile")
+
+    OpenAICompatibleProviderSettings.applyProfileDefaults(.localProxy, to: defaults)
+
+    XCTAssertEqual(OpenAICompatibleProviderSettings.loadProfile(from: defaults), .localProxy)
+    XCTAssertEqual(OpenAICompatibleProviderSettings.loadBaseURL(from: defaults), "http://localhost:1234")
+    XCTAssertEqual(OpenAICompatibleProviderSettings.loadModelID(from: defaults), "qwen2.5vl:7b")
+    XCTAssertEqual(OpenAICompatibleProviderSettings.loadAuthMode(from: defaults), .none)
+  }
+
+  func testOpenAICompatibleAuthorizationHeadersRespectAuthMode() {
+    let defaults = UserDefaults(suiteName: "DayflowTests.OpenAICompatibleAuth")!
+    defaults.removePersistentDomain(forName: "DayflowTests.OpenAICompatibleAuth")
+
+    OpenAICompatibleProviderSettings.saveAuthMode(.apiKeyHeader, to: defaults)
+
+    XCTAssertEqual(
+      OpenAICompatibleProviderSettings.authorizationHeaders(apiKey: "test-key", from: defaults),
+      ["x-api-key": "test-key"]
+    )
+  }
 }

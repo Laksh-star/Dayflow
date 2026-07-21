@@ -5,21 +5,48 @@ struct WeeklyHeader: View {
   let canNavigateForward: Bool
   let onPrevious: () -> Void
   let onNext: () -> Void
+  var onExportMarkdown: (() -> Void)? = nil
 
   var body: some View {
-    HStack(spacing: 14) {
-      WeeklyNavigationButton(assetName: "LeftArrow") {
-        onPrevious()
+    ZStack {
+      HStack(spacing: 14) {
+        WeeklyNavigationButton(assetName: "LeftArrow") {
+          onPrevious()
+        }
+
+        Text(title)
+          .font(.custom("InstrumentSerif-Regular", size: 20))
+          .foregroundStyle(Color.black)
+          .multilineTextAlignment(.center)
+          .frame(width: 344)
+
+        WeeklyNavigationButton(assetName: "RightArrow", isEnabled: canNavigateForward) {
+          onNext()
+        }
       }
 
-      Text(title)
-        .font(.custom("InstrumentSerif-Regular", size: 20))
-        .foregroundStyle(Color.black)
-        .multilineTextAlignment(.center)
-        .frame(width: 344)
+      if let onExportMarkdown {
+        Button(action: onExportMarkdown) {
+          HStack(spacing: 6) {
+            Image(systemName: "square.and.arrow.up")
+              .font(.system(size: 12, weight: .semibold))
 
-      WeeklyNavigationButton(assetName: "RightArrow", isEnabled: canNavigateForward) {
-        onNext()
+            Text("Export Markdown")
+              .font(.custom("Figtree-Medium", size: 13))
+          }
+          .foregroundStyle(Color(hex: "5E4B3E"))
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .background(Color(hex: "FFF7EF"))
+          .clipShape(Capsule(style: .continuous))
+          .overlay(
+            Capsule(style: .continuous)
+              .stroke(Color(hex: "E8D8C8"), lineWidth: 1.2)
+          )
+        }
+        .buttonStyle(DayflowPressScaleButtonStyle())
+        .pointingHandCursorOnHover(reassertOnPressEnd: true)
+        .frame(maxWidth: .infinity, alignment: .trailing)
       }
     }
     .frame(maxWidth: .infinity)

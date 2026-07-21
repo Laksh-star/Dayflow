@@ -19,7 +19,7 @@ enum StoragePathMigrator {
     let fileManager = FileManager.default
     let legacyBase = fileManager.homeDirectoryForCurrentUser
       .appendingPathComponent(
-        "Library/Containers/\(bundleID)/Data/Library/Application Support/Dayflow", isDirectory: true
+        "Library/Containers/\(bundleID)/Data/Library/Application Support/DayflowDev", isDirectory: true
       )
 
     guard fileManager.fileExists(atPath: legacyBase.path) else {
@@ -37,7 +37,7 @@ enum StoragePathMigrator {
       return
     }
 
-    let destinationBase = newSupport.appendingPathComponent("Dayflow", isDirectory: true)
+    let destinationBase = newSupport.appendingPathComponent("DayflowDev", isDirectory: true)
 
     let normalizedLegacy = legacyBase.standardizedFileURL.path
     let normalizedDestination = destinationBase.standardizedFileURL.path

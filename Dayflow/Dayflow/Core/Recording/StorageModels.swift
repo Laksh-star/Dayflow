@@ -45,6 +45,32 @@ struct DailyStandupEntry: Codable, Sendable {
   let updatedAt: Date?
 }
 
+struct FailedBatchRepairItem: Identifiable, Equatable, Sendable {
+  let id: Int64
+  let batchId: Int64
+  let startTs: Int
+  let endTs: Int
+  let failedCardCount: Int
+  let screenshotCount: Int
+  let batchStatus: String
+  let reason: String?
+
+  var isRetryable: Bool {
+    screenshotCount > 0
+  }
+}
+
+struct FailedBatchRepairSummary: Equatable, Sendable {
+  let day: String
+  let items: [FailedBatchRepairItem]
+  let duplicateFailedCardCount: Int
+
+  var failedBatchCount: Int { items.count }
+  var retryableBatchIds: [Int64] {
+    items.filter(\.isRetryable).map(\.batchId)
+  }
+}
+
 // NEW: Observation struct for first-class transcript storage
 struct Observation: Codable, Sendable {
   let id: Int64?

@@ -13,6 +13,8 @@ struct LLMProviderSetupView: View {
     switch activeProviderType {
     case "ollama":
       return "Use local AI"
+    case OpenAICompatibleProviderSettings.providerID:
+      return "Connect API"
     case "chatgpt_claude":
       return "Connect ChatGPT or Claude"
     default:
@@ -158,6 +160,82 @@ struct LLMProviderSetupView: View {
       )
       .disabled(!setupState.canContinue)
       .opacity(!setupState.canContinue ? 0.5 : 1.0)
+    }
+  }
+
+  var apiProviderSetupOptions: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      VStack(alignment: .leading, spacing: 6) {
+        Text("Provider profile")
+          .font(.custom("Figtree", size: 12))
+          .fontWeight(.semibold)
+          .foregroundColor(SettingsStyle.secondary)
+
+        Picker("Provider profile", selection: $setupState.openAICompatibleProfile) {
+          ForEach(OpenAICompatibleProviderProfile.allCases) { profile in
+            Text(profile.displayName).tag(profile)
+          }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .frame(maxWidth: 260, alignment: .leading)
+        .onChange(of: setupState.openAICompatibleProfile) { _, newValue in
+          setupState.applyOpenAICompatibleProfile(newValue)
+        }
+      }
+
+      HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 6) {
+          Text("Auth header")
+            .font(.custom("Figtree", size: 12))
+            .fontWeight(.semibold)
+            .foregroundColor(SettingsStyle.secondary)
+
+          Picker("Auth header", selection: $setupState.openAICompatibleAuthMode) {
+            ForEach(OpenAICompatibleAuthMode.allCases) { mode in
+              Text(mode.displayName).tag(mode)
+            }
+          }
+          .pickerStyle(.menu)
+          .labelsHidden()
+          .frame(width: 180, alignment: .leading)
+        }
+
+        if setupState.openAICompatibleAuthMode == .customHeader {
+          VStack(alignment: .leading, spacing: 6) {
+            Text("Header name")
+              .font(.custom("Figtree", size: 12))
+              .fontWeight(.semibold)
+              .foregroundColor(SettingsStyle.secondary)
+
+            TextField(
+              OpenAICompatibleProviderSettings.defaultCustomHeaderName,
+              text: $setupState.openAICompatibleCustomHeaderName
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 210)
+          }
+        }
+      }
+
+      VStack(alignment: .leading, spacing: 6) {
+        Text("Token parameter")
+          .font(.custom("Figtree", size: 12))
+          .fontWeight(.semibold)
+          .foregroundColor(SettingsStyle.secondary)
+
+        Picker(
+          "Token parameter",
+          selection: $setupState.openAICompatibleUseMaxCompletionTokensOverride
+        ) {
+          Text("Auto").tag(Optional<Bool>.none)
+          Text("max_tokens").tag(Optional(false))
+          Text("max_completion_tokens").tag(Optional(true))
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: 500)
+      }
     }
   }
 
@@ -461,6 +539,33 @@ struct LLMProviderSetupView: View {
                     setupState.testSuccessful = success
                   }
                 )
+              } else if providerType == OpenAICompatibleProviderSettings.providerID {
+                apiProviderSetupOptions
+
+                LocalLLMTestView(
+                  baseURL: $setupState.openAICompatibleBaseURL,
+                  modelId: $setupState.openAICompatibleModelId,
+                  apiKey: $setupState.openAICompatibleAPIKey,
+                  engine: .custom,
+                  showInputs: true,
+                  buttonLabel: "Test API",
+                  basePlaceholder: OpenAICompatibleProviderSettings.defaultBaseURL,
+                  modelPlaceholder: OpenAICompatibleProviderSettings.defaultModelID,
+                  apiKeyLabel: "API key",
+                  apiKeyHelpText: setupState.openAICompatibleAuthHelpText,
+                  failureHelpText:
+                    "Check that the endpoint supports OpenAI Chat Completions with vision input and that the model ID is available for this key.",
+                  usesBuiltInCustomAuth: false,
+                  additionalHeaders: { setupState.openAICompatibleAuthHeadersForTest },
+                  usesMaxCompletionTokens: setupState.openAICompatibleUsesMaxCompletionTokens,
+                  onTestComplete: { success in
+                    setupState.hasTestedConnection = true
+                    setupState.testSuccessful = success
+                    if success {
+                      persistOpenAICompatibleSettings()
+                    }
+                  }
+                )
               } else {
                 // Engine selection: LM Studio or Custom
                 VStack(alignment: .leading, spacing: 12) {
@@ -622,6 +727,13 @@ struct LLMProviderSetupView: View {
       {
         persistLocalSettings()
       }
+    } else if activeProviderType == OpenAICompatibleProviderSettings.providerID {
+      if case .information(let title, _) = setupState.currentStep.contentType,
+        title == "Testing" || title == "Test Connection",
+        setupState.testSuccessful
+      {
+        persistOpenAICompatibleSettings()
+      }
     }
 
     if setupState.isLastStep {
@@ -644,6 +756,10 @@ struct LLMProviderSetupView: View {
     // Save local endpoint for local engine selection
     if activeProviderType == "ollama" {
       persistLocalSettings()
+    }
+
+    if activeProviderType == OpenAICompatibleProviderSettings.providerID {
+      persistOpenAICompatibleSettings()
     }
 
     // Mark setup as complete
@@ -672,6 +788,22 @@ struct LLMProviderSetupView: View {
     } else {
       UserDefaults.standard.set(trimmed, forKey: "llmLocalAPIKey")
     }
+  }
+
+  func persistOpenAICompatibleSettings() {
+    OpenAICompatibleProviderSettings.saveProfile(setupState.openAICompatibleProfile)
+    OpenAICompatibleProviderSettings.saveBaseURL(setupState.openAICompatibleBaseURL)
+    OpenAICompatibleProviderSettings.saveModelID(setupState.openAICompatibleModelId)
+    OpenAICompatibleProviderSettings.saveAuthMode(setupState.openAICompatibleAuthMode)
+    OpenAICompatibleProviderSettings.saveCustomHeaderName(setupState.openAICompatibleCustomHeaderName)
+    OpenAICompatibleProviderSettings.saveUsesMaxCompletionTokensOverride(
+      setupState.openAICompatibleUseMaxCompletionTokensOverride
+    )
+    _ = OpenAICompatibleProviderSettings.saveAPIKey(setupState.openAICompatibleAPIKey)
+    let type = LLMProviderType.openAICompatible(
+      endpoint: OpenAICompatibleProviderSettings.loadBaseURL()
+    )
+    type.persist()
   }
 
   func openGoogleAIStudio() {

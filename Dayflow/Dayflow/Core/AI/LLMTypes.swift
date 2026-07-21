@@ -5,6 +5,23 @@
 
 import Foundation
 
+struct LLMProcessingOverride: Equatable, Sendable {
+  let providerID: LLMProviderID
+  let modelID: String?
+  let chatTool: ChatCLITool?
+
+  init(providerID: LLMProviderID, modelID: String? = nil, chatTool: ChatCLITool? = nil) {
+    self.providerID = providerID
+    self.modelID = modelID?.trimmingCharacters(in: .whitespacesAndNewlines)
+    self.chatTool = chatTool
+  }
+
+  var sanitizedModelID: String? {
+    guard let modelID, !modelID.isEmpty else { return nil }
+    return modelID
+  }
+}
+
 struct ActivityGenerationContext {
   let batchObservations: [Observation]
   let existingCards: [ActivityCardData]  // Cards that overlap with current analysis window
@@ -95,6 +112,7 @@ enum LLMProviderType: Codable {
   case geminiDirect
   case dayflowBackend(endpoint: String = "")
   case ollamaLocal(endpoint: String = "http://localhost:11434")
+  case openAICompatible(endpoint: String = OpenAICompatibleProviderSettings.defaultBaseURL)
   case chatGPTClaude
 
   private static let providerDefaultsKey = "llmProviderType"
@@ -132,6 +150,8 @@ enum LLMProviderType: Codable {
       return "dayflow"
     case .ollamaLocal:
       return "ollama"
+    case .openAICompatible:
+      return OpenAICompatibleProviderSettings.providerID
     case .chatGPTClaude:
       return "chatgpt_claude"
     }
@@ -159,6 +179,8 @@ enum LLMProviderType: Codable {
         return .ollamaLocal(endpoint: endpoint)
       }
       return .ollamaLocal()
+    case "openai_compatible":
+      return .openAICompatible(endpoint: OpenAICompatibleProviderSettings.loadBaseURL(from: defaults))
     case "chatgpt":
       if defaults.string(forKey: chatCLIPreferredToolDefaultsKey) == nil {
         defaults.set("codex", forKey: chatCLIPreferredToolDefaultsKey)
@@ -177,10 +199,11 @@ enum LLMProviderType: Codable {
   }
 }
 
-enum LLMProviderID: String, Codable, CaseIterable {
+enum LLMProviderID: String, Codable, CaseIterable, Sendable {
   case gemini
   case dayflow
   case ollama
+  case openAICompatible = "openai_compatible"
   case chatGPTClaude = "chatgpt_claude"
 
   var analyticsName: String {
@@ -191,6 +214,8 @@ enum LLMProviderID: String, Codable, CaseIterable {
       return "dayflow"
     case .ollama:
       return "ollama"
+    case .openAICompatible:
+      return "openai_compatible"
     case .chatGPTClaude:
       return "chat_cli"
     }
@@ -204,6 +229,8 @@ enum LLMProviderID: String, Codable, CaseIterable {
       return .dayflow
     case .ollamaLocal:
       return .ollama
+    case .openAICompatible:
+      return .openAICompatible
     case .chatGPTClaude:
       return .chatGPTClaude
     }
@@ -217,6 +244,8 @@ enum LLMProviderID: String, Codable, CaseIterable {
       return "dayflow"
     case .ollama:
       return "local"
+    case .openAICompatible:
+      return "openai_compatible"
     case .chatGPTClaude:
       return chatTool == .claude ? "claude" : "chatgpt"
     }

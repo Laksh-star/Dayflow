@@ -61,6 +61,12 @@ struct LocalLLMTestView: View {
   let buttonLabel: String
   let basePlaceholder: String?
   let modelPlaceholder: String?
+  let apiKeyLabel: String
+  let apiKeyHelpText: String
+  let failureHelpText: String
+  let usesBuiltInCustomAuth: Bool
+  let additionalHeaders: () -> [String: String]
+  let usesMaxCompletionTokens: (_ modelId: String, _ baseURL: String) -> Bool
   let onTestComplete: (Bool) -> Void
 
   init(
@@ -72,6 +78,20 @@ struct LocalLLMTestView: View {
     buttonLabel: String = "Test Local API",
     basePlaceholder: String? = nil,
     modelPlaceholder: String? = nil,
+    apiKeyLabel: String = "API key (optional)",
+    apiKeyHelpText: String =
+      "Stored locally in UserDefaults and sent as a Bearer token for custom endpoints (LiteLLM, OpenRouter, etc.)",
+    failureHelpText: String =
+      "If you get stuck here, you can go back and choose the ‘Bring your own key’ option — it only takes a minute to set up.",
+    usesBuiltInCustomAuth: Bool = true,
+    additionalHeaders: @escaping () -> [String: String] = { [:] },
+    usesMaxCompletionTokens: @escaping (_ modelId: String, _ baseURL: String) -> Bool = {
+      modelId, baseURL in
+      OpenAICompatibleProviderSettings.usesMaxCompletionTokens(
+        modelId: modelId,
+        baseURL: baseURL
+      )
+    },
     onTestComplete: @escaping (Bool) -> Void
   ) {
     _baseURL = baseURL
@@ -82,6 +102,12 @@ struct LocalLLMTestView: View {
     self.buttonLabel = buttonLabel
     self.basePlaceholder = basePlaceholder
     self.modelPlaceholder = modelPlaceholder
+    self.apiKeyLabel = apiKeyLabel
+    self.apiKeyHelpText = apiKeyHelpText
+    self.failureHelpText = failureHelpText
+    self.usesBuiltInCustomAuth = usesBuiltInCustomAuth
+    self.additionalHeaders = additionalHeaders
+    self.usesMaxCompletionTokens = usesMaxCompletionTokens
     self.onTestComplete = onTestComplete
   }
 
@@ -120,16 +146,14 @@ struct LocalLLMTestView: View {
 
         if engine == .custom {
           VStack(alignment: .leading, spacing: 6) {
-            Text("API key (optional)")
+            Text(apiKeyLabel)
               .font(.custom("Figtree", size: 12))
               .fontWeight(.semibold)
               .foregroundColor(SettingsStyle.secondary)
             SecureField("sk-live-...", text: $apiKey)
               .textFieldStyle(.roundedBorder)
               .disableAutocorrection(true)
-            Text(
-              "Stored locally in UserDefaults and sent as a Bearer token for custom endpoints (LiteLLM, OpenRouter, etc.)"
-            )
+            Text(apiKeyHelpText)
             .font(.custom("Figtree", size: 11))
             .foregroundColor(SettingsStyle.meta)
           }
@@ -148,9 +172,7 @@ struct LocalLLMTestView: View {
       } else if let msg = resultMessage {
         VStack(alignment: .leading, spacing: 6) {
           SettingsStatusDot(state: .bad, label: msg)
-          Text(
-            "If you get stuck here, you can go back and choose the ‘Bring your own key’ option — it only takes a minute to set up."
-          )
+          Text(failureHelpText)
           .font(.custom("Figtree", size: 12))
           .foregroundColor(SettingsStyle.secondary)
           .fixedSize(horizontal: false, vertical: true)
@@ -182,7 +204,8 @@ struct LocalLLMTestView: View {
           ]
         )
       ],
-      maxTokens: 10
+      maxTokens: 10,
+      usesMaxCompletionTokens: usesMaxCompletionTokens(modelId, baseURL)
     )
 
     var request = URLRequest(url: url)
@@ -191,8 +214,11 @@ struct LocalLLMTestView: View {
     if engine == .lmstudio {
       request.setValue("Bearer lm-studio", forHTTPHeaderField: "Authorization")
     }
-    if engine == .custom && !trimmedAPIKey.isEmpty {
+    if usesBuiltInCustomAuth && engine == .custom && !trimmedAPIKey.isEmpty {
       request.setValue("Bearer \(trimmedAPIKey)", forHTTPHeaderField: "Authorization")
+    }
+    for (field, value) in additionalHeaders() {
+      request.setValue(value, forHTTPHeaderField: field)
     }
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -240,10 +266,29 @@ struct LocalLLMTestView: View {
   }
 }
 
-struct LocalLLMChatRequest: Codable {
+struct LocalLLMChatRequest: Encodable {
   let model: String
   let messages: [LocalLLMChatMessage]
   let maxTokens: Int
+  let usesMaxCompletionTokens: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case model
+    case messages
+    case maxTokens = "max_tokens"
+    case maxCompletionTokens = "max_completion_tokens"
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(model, forKey: .model)
+    try container.encode(messages, forKey: .messages)
+    if usesMaxCompletionTokens {
+      try container.encode(maxTokens, forKey: .maxCompletionTokens)
+    } else {
+      try container.encode(maxTokens, forKey: .maxTokens)
+    }
+  }
 }
 
 struct LocalLLMChatMessage: Codable {

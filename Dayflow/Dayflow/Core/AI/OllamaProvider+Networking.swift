@@ -64,8 +64,8 @@ extension OllamaProvider {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        applyAuthorizationHeader(to: &urlRequest)
-        urlRequest.httpBody = try JSONEncoder().encode(request)
+        applyAdditionalHeaders(to: &urlRequest)
+        urlRequest.httpBody = try encodedChatRequest(request)
         urlRequest.timeoutInterval = 60.0  // 60-second timeout
 
         let start = Date()
@@ -190,7 +190,7 @@ extension OllamaProvider {
           if operation == "describe_frame" {
             fallbackBodyForLogging = nil
           } else {
-            fallbackBodyForLogging = try? JSONEncoder().encode(request)
+            fallbackBodyForLogging = try? encodedChatRequest(request)
           }
           let ctx =
             ctxForAttempt
@@ -257,12 +257,25 @@ extension OllamaProvider {
     return response.choices.first?.message.content ?? ""
   }
 
-  private func applyAuthorizationHeader(to request: inout URLRequest) {
-    if isLMStudio {
-      request.setValue("Bearer lm-studio", forHTTPHeaderField: "Authorization")
-    } else if isCustomEngine, let token = customAPIKey {
-      request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+  private func applyAdditionalHeaders(to request: inout URLRequest) {
+    for (field, value) in additionalHeaders {
+      request.setValue(value, forHTTPHeaderField: field)
     }
+  }
+
+  private func encodedChatRequest(_ request: ChatRequest) throws -> Data {
+    let encoded = try JSONEncoder().encode(request)
+    guard usesMaxCompletionTokens else { return encoded }
+
+    guard var payload = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else {
+      return encoded
+    }
+
+    if let maxTokens = payload.removeValue(forKey: "max_tokens") {
+      payload["max_completion_tokens"] = maxTokens
+    }
+
+    return try JSONSerialization.data(withJSONObject: payload, options: [])
   }
 }
 

@@ -225,6 +225,117 @@ extension StorageManager {
       }) ?? []
   }
 
+  func failedBatchRepairSummary(forDay day: String) -> FailedBatchRepairSummary {
+    let bounds = timelineDayBounds(for: day)
+    guard let bounds else {
+      return FailedBatchRepairSummary(day: day, items: [], duplicateFailedCardCount: 0)
+    }
+
+    let items =
+      (try? timedRead("failedBatchRepairSummary(\(day))") { db in
+        try Row.fetchAll(
+          db,
+          sql: """
+                SELECT
+                  tc.batch_id AS batch_id,
+                  MIN(tc.id) AS representative_card_id,
+                  MIN(tc.start_ts) AS start_ts,
+                  MAX(tc.end_ts) AS end_ts,
+                  COUNT(tc.id) AS failed_card_count,
+                  COALESCE(ab.status, 'unknown') AS batch_status,
+                  ab.reason AS reason,
+                  (
+                    SELECT COUNT(*)
+                    FROM batch_screenshots bs
+                    JOIN screenshots s ON s.id = bs.screenshot_id
+                    WHERE bs.batch_id = tc.batch_id
+                      AND s.is_deleted = 0
+                  ) AS screenshot_count
+                FROM timeline_cards tc
+                LEFT JOIN analysis_batches ab ON ab.id = tc.batch_id
+                WHERE tc.start_ts >= ?
+                  AND tc.start_ts < ?
+                  AND tc.is_deleted = 0
+                  AND tc.title = 'Processing failed'
+                  AND tc.batch_id IS NOT NULL
+                GROUP BY tc.batch_id
+                ORDER BY MIN(tc.start_ts) ASC, tc.batch_id ASC
+            """, arguments: [bounds.startTs, bounds.endTs]
+        ).map { row in
+          FailedBatchRepairItem(
+            id: row["representative_card_id"] ?? 0,
+            batchId: row["batch_id"] ?? 0,
+            startTs: row["start_ts"] ?? 0,
+            endTs: row["end_ts"] ?? 0,
+            failedCardCount: row["failed_card_count"] ?? 0,
+            screenshotCount: row["screenshot_count"] ?? 0,
+            batchStatus: row["batch_status"] ?? "unknown",
+            reason: row["reason"]
+          )
+        }
+      }) ?? []
+
+    let duplicateCount = items.reduce(0) { total, item in
+      total + max(0, item.failedCardCount - 1)
+    }
+    return FailedBatchRepairSummary(
+      day: day,
+      items: items,
+      duplicateFailedCardCount: duplicateCount
+    )
+  }
+
+  func dedupeFailedTimelineCards(forDay day: String) -> Int {
+    let bounds = timelineDayBounds(for: day)
+    guard let bounds else { return 0 }
+
+    var deletedCount = 0
+
+    do {
+      try timedWrite("dedupeFailedTimelineCards(\(day))") { db in
+        let duplicateRows = try Row.fetchAll(
+          db,
+          sql: """
+                SELECT id FROM (
+                  SELECT
+                    id,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY batch_id, start_ts, end_ts, title
+                      ORDER BY id ASC
+                    ) AS row_number
+                  FROM timeline_cards
+                  WHERE start_ts >= ?
+                    AND start_ts < ?
+                    AND is_deleted = 0
+                    AND title = 'Processing failed'
+                    AND batch_id IS NOT NULL
+                )
+                WHERE row_number > 1
+            """,
+          arguments: [bounds.startTs, bounds.endTs]
+        )
+
+        let ids: [Int64] = duplicateRows.compactMap { $0["id"] }
+        guard !ids.isEmpty else { return }
+
+        let placeholders = Array(repeating: "?", count: ids.count).joined(separator: ",")
+        try db.execute(
+          sql: """
+                UPDATE timeline_cards
+                SET is_deleted = 1
+                WHERE id IN (\(placeholders))
+            """,
+          arguments: StatementArguments(ids)
+        )
+        deletedCount = ids.count
+      }
+    } catch {
+      print("dedupeFailedTimelineCards(forDay:) failed: \(error)")
+    }
+
+    return deletedCount
+  }
+
   func countCompletedAnalysisBatchesForWeeklyAccess() -> Int {
     (try? timedRead("countCompletedAnalysisBatchesForWeeklyAccess") { db in
       try Int.fetchOne(
@@ -236,6 +347,23 @@ extension StorageManager {
           """
       ) ?? 0
     }) ?? 0
+  }
+
+  private func timelineDayBounds(for day: String) -> (startTs: Int, endTs: Int)? {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    guard let dayDate = formatter.date(from: day) else { return nil }
+
+    let calendar = Calendar.current
+    guard let startOfDay = calendar.date(bySettingHour: 4, minute: 0, second: 0, of: dayDate),
+      let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)
+    else {
+      return nil
+    }
+    return (
+      Int(startOfDay.timeIntervalSince1970),
+      Int(endOfDay.timeIntervalSince1970)
+    )
   }
 
 }
