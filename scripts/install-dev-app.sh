@@ -10,6 +10,27 @@ LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/Current/F
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
+if [[ "${DAYFLOW_ALLOW_ADHOC_SIGNING:-0}" != "1" ]]; then
+  SIGNING_IDENTITY="$(security find-identity -v -p codesigning | awk -F '"' '/Apple Development|Mac Developer|Developer ID Application/ { print $2; exit }')"
+
+  if [[ -z "${SIGNING_IDENTITY:-}" ]]; then
+    cat >&2 <<'EOF'
+No valid code-signing identity was found.
+
+Dayflow Dev needs a stable signing identity for macOS Screen & System Audio
+Recording permission to survive rebuilds. Create an Apple Development certificate
+in Xcode first, then rerun this script.
+
+Temporary ad-hoc builds are still possible with:
+  DAYFLOW_ALLOW_ADHOC_SIGNING=1 ./scripts/install-dev-app.sh
+
+EOF
+    exit 1
+  fi
+else
+  SIGNING_IDENTITY="-"
+fi
+
 echo "Building Dayflow Dev..."
 xcodebuild \
   -project "$PROJECT_PATH" \
@@ -17,7 +38,7 @@ xcodebuild \
   -configuration Debug \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY=- \
+  CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
   DEVELOPMENT_TEAM= \
   PROVISIONING_PROFILE_SPECIFIER= \
   build \
