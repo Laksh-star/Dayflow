@@ -45,6 +45,26 @@ final class OpenAICompatibleConfigurationTests: XCTestCase {
     XCTAssertEqual(OpenAICompatiblePreferences.keychainProvider, "openai_compatible")
   }
 
+  func testPreferencesLoadLegacySplitOpenAICompatibleSettings() throws {
+    let suiteName = "OpenAICompatibleConfigurationTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    defaults.set("openai", forKey: "llmOpenAICompatibleProfile")
+    defaults.set("  https://api.openai.com  ", forKey: "llmOpenAICompatibleBaseURL")
+    defaults.set("  gpt-5.4-mini-2026-03-17  ", forKey: "llmOpenAICompatibleModelId")
+
+    let configuration = try XCTUnwrap(OpenAICompatiblePreferences.load(from: defaults))
+
+    XCTAssertEqual(configuration.preset, .custom)
+    XCTAssertEqual(configuration.baseURL, "https://api.openai.com")
+    XCTAssertEqual(configuration.modelID, "gpt-5.4-mini-2026-03-17")
+    XCTAssertEqual(
+      configuration.chatCompletionsURL?.absoluteString,
+      "https://api.openai.com/v1/chat/completions"
+    )
+  }
+
   func testInjectedRuntimeBuildsIndependentBearerRequest() throws {
     let storedConfiguration = OpenAICompatibleConfiguration(
       preset: .custom,
@@ -85,6 +105,36 @@ final class OpenAICompatibleConfigurationTests: XCTestCase {
     let body = try XCTUnwrap(request.httpBody)
     let decoded = try JSONDecoder().decode(OllamaProvider.ChatRequest.self, from: body)
     XCTAssertEqual(decoded.model, "remote-vision-model")
+  }
+
+  func testInjectedOpenAIGPT5RuntimeUsesMaxCompletionTokens() throws {
+    let storedConfiguration = OpenAICompatibleConfiguration(
+      preset: .custom,
+      baseURL: "https://api.openai.com",
+      modelID: "gpt-5.4-mini-2026-03-17"
+    )
+    let runtimeConfiguration = OpenAICompatibleRuntimeConfiguration(
+      configuration: storedConfiguration,
+      bearerToken: "remote-secret"
+    )
+    let provider = OllamaProvider(openAICompatible: runtimeConfiguration)
+    let chatRequest = OllamaProvider.ChatRequest(
+      model: provider.savedModelId,
+      messages: [],
+      temperature: 0.2,
+      max_tokens: 123,
+      stream: false
+    )
+
+    let request = try provider.makeChatURLRequest(chatRequest)
+    let body = try XCTUnwrap(request.httpBody)
+    let decoded = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: body) as? [String: Any]
+    )
+
+    XCTAssertNil(decoded["max_tokens"])
+    XCTAssertEqual(decoded["max_completion_tokens"] as? Int, 123)
+    XCTAssertEqual(request.url?.absoluteString, "https://api.openai.com/v1/chat/completions")
   }
 
   func testInjectedRuntimeOmitsEmptyBearerToken() throws {
