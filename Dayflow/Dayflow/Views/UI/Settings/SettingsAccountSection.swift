@@ -11,16 +11,20 @@ struct SettingsAccountSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: SettingsStyle.sectionSpacing) {
-      if authManager.entitlements.status == "active" {
+      if DayflowBuildIdentity.isDevBuild {
+        devAccountSection
+      } else if authManager.entitlements.status == "active" {
         currentPlanSection
       } else {
         accountSection
         upgradeSection
       }
 
-      referralSection
+      if !DayflowBuildIdentity.isDevBuild {
+        referralSection
+      }
 
-      if let errorText = authManager.errorText {
+      if !DayflowBuildIdentity.isDevBuild, let errorText = authManager.errorText {
         Text(errorText)
           .font(.custom("Figtree", size: 11))
           .foregroundColor(SettingsStyle.destructive)
@@ -38,11 +42,44 @@ struct SettingsAccountSection: View {
       .preferredColorScheme(.light)
     }
     .task {
+      guard !DayflowBuildIdentity.isDevBuild else { return }
       authManager.loadStoredSessionIfNeeded()
     }
     .onChange(of: authManager.pendingReferralCode) { _, pendingCode in
       guard let pendingCode, applyReferralCode.isEmpty else { return }
       applyReferralCode = pendingCode
+    }
+  }
+
+  private var devAccountSection: some View {
+    SettingsSection(
+      title: "Dayflow Dev",
+      subtitle: "Local fork build for personal workflow experiments."
+    ) {
+      VStack(alignment: .leading, spacing: 14) {
+        SettingsRow(label: "Build", subtitle: "Signed and isolated from public Dayflow") {
+          SettingsStatusDot(state: .good, label: "Dev mode")
+        }
+
+        SettingsRow(label: "Bundle ID", subtitle: Bundle.main.bundleIdentifier ?? "Unknown") {
+          SettingsBadge(text: "LOCAL")
+        }
+
+        SettingsRow(
+          label: "Storage",
+          subtitle: "~/Library/Application Support/DayflowDev/",
+          showsDivider: false
+        ) {
+          SettingsBadge(text: "ISOLATED")
+        }
+
+        Text(
+          "Paid account, checkout, referrals, and production update flows are hidden in this dev build. AI providers are configured from Providers, and local workflow exports are configured from Export."
+        )
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(SettingsStyle.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      }
     }
   }
 

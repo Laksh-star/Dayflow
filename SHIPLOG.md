@@ -24,6 +24,7 @@ This file tracks local fork work that may or may not be suitable for upstream Da
   - Editable review rows for include/exclude, description, and Toggl project.
   - CSV export now uses the reviewed rows instead of regenerating hidden defaults.
   - Consolidation keeps adjacent related Dayflow cards together while summary mode rolls up by day/project.
+- Replaced the production Account/Pro/referral settings with a local Dayflow Dev status panel for the dev bundle.
 
 ## Working Principles
 
