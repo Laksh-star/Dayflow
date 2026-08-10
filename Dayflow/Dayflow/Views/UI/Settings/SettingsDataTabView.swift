@@ -13,6 +13,7 @@ struct SettingsDataTabView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: SettingsStyle.sectionSpacing) {
       exportSection
+      togglDraftSection
       reprocessSection
     }
   }
@@ -109,6 +110,157 @@ struct SettingsDataTabView: View {
         }
       }
     }
+  }
+
+  // MARK: - Toggl draft export
+
+  private var togglDraftSection: some View {
+    SettingsSection(
+      title: "Toggl draft export",
+      subtitle: "Map Dayflow projects to Toggl projects before exporting reviewed time entries."
+    ) {
+      VStack(alignment: .leading, spacing: 14) {
+        Text(
+          "Mappings use: Dayflow project -> Toggl project | keyword,domain,app. Use SKIP as the Toggl project to exclude matching work."
+        )
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(SettingsStyle.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+
+        TextEditor(text: $viewModel.togglMappingText)
+          .font(.custom("Figtree", size: 12))
+          .scrollContentBackground(.hidden)
+          .padding(8)
+          .frame(minHeight: 108)
+          .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .fill(Color.black.opacity(0.035))
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .stroke(SettingsStyle.divider, lineWidth: 1)
+          )
+
+        HStack(alignment: .center, spacing: 10) {
+          Picker("Rounding", selection: $viewModel.togglRounding) {
+            ForEach(TogglRounding.allCases) { rounding in
+              Text(rounding.label).tag(rounding)
+            }
+          }
+          .pickerStyle(.segmented)
+          .frame(maxWidth: 260)
+
+          Toggle("Personal", isOn: $viewModel.togglIncludePersonal)
+            .toggleStyle(.checkbox)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.text)
+
+          Toggle("Distractions", isOn: $viewModel.togglIncludeDistractions)
+            .toggleStyle(.checkbox)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.text)
+        }
+
+        HStack(spacing: 10) {
+          SettingsSecondaryButton(title: "Save mappings") {
+            viewModel.saveTogglMappings()
+          }
+          SettingsSecondaryButton(title: "Reset") {
+            viewModel.resetTogglMappings()
+          }
+          SettingsSecondaryButton(title: "Refresh preview") {
+            viewModel.refreshTogglDraft()
+          }
+          SettingsPrimaryButton(
+            title: "Export Toggl CSV",
+            systemImage: "square.and.arrow.down",
+            isDisabled: viewModel.togglDraftRows.filter { !$0.isSkipped }.isEmpty,
+            action: viewModel.exportTogglDraftCSV
+          )
+        }
+
+        togglDraftPreview
+
+        if let message = viewModel.togglStatusMessage {
+          Text(message)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.statusGood)
+        }
+
+        if let error = viewModel.togglErrorMessage {
+          Text(error)
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.destructive)
+        }
+      }
+      .onChange(of: viewModel.exportStartDate) { viewModel.refreshTogglDraft() }
+      .onChange(of: viewModel.exportEndDate) { viewModel.refreshTogglDraft() }
+    }
+  }
+
+  private var togglDraftPreview: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Text("Preview")
+          .font(.custom("Figtree", size: 13).weight(.semibold))
+          .foregroundColor(SettingsStyle.text)
+        Spacer()
+        Text("\(viewModel.togglDraftRows.count) rows")
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.meta)
+      }
+
+      if viewModel.togglDraftRows.isEmpty {
+        Text("No matching timeline cards for the selected range.")
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.secondary)
+      } else {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(viewModel.togglDraftRows.prefix(12)) { row in
+            togglDraftRow(row)
+            if row.id != viewModel.togglDraftRows.prefix(12).last?.id {
+              Rectangle()
+                .fill(SettingsStyle.divider)
+                .frame(height: 1)
+            }
+          }
+
+          if viewModel.togglDraftRows.count > 12 {
+            Text("+ \(viewModel.togglDraftRows.count - 12) more rows")
+              .font(.custom("Figtree", size: 12))
+              .foregroundColor(SettingsStyle.meta)
+              .padding(.top, 8)
+          }
+        }
+      }
+    }
+  }
+
+  private func togglDraftRow(_ row: TogglDraftRow) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      VStack(alignment: .leading, spacing: 3) {
+        Text(row.description)
+          .font(.custom("Figtree", size: 12).weight(.semibold))
+          .foregroundColor(row.isSkipped ? SettingsStyle.meta : SettingsStyle.text)
+          .lineLimit(2)
+        Text("\(row.dayflowProject) -> \(row.togglProject)")
+          .font(.custom("Figtree", size: 11))
+          .foregroundColor(SettingsStyle.secondary)
+          .lineLimit(1)
+      }
+
+      Spacer(minLength: 10)
+
+      VStack(alignment: .trailing, spacing: 3) {
+        Text("\(row.roundedMinutes) min")
+          .font(.custom("Figtree", size: 12).weight(.semibold))
+          .foregroundColor(row.isSkipped ? SettingsStyle.meta : SettingsStyle.text)
+        Text(row.isSkipped ? (row.skippedReason ?? "Skipped") : "\(row.sourceCardCount) cards")
+          .font(.custom("Figtree", size: 11))
+          .foregroundColor(row.isSkipped ? SettingsStyle.destructive : SettingsStyle.meta)
+      }
+    }
+    .padding(.vertical, 9)
   }
 
   // MARK: - Reprocess day

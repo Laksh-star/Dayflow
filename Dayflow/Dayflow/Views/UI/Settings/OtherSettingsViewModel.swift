@@ -44,6 +44,13 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var isExportingTimelineRange = false
   @Published var exportStatusMessage: String?
   @Published var exportErrorMessage: String?
+  @Published var togglMappingText: String
+  @Published var togglRounding: TogglRounding
+  @Published var togglIncludePersonal: Bool
+  @Published var togglIncludeDistractions: Bool
+  @Published var togglDraftRows: [TogglDraftRow] = []
+  @Published var togglStatusMessage: String?
+  @Published var togglErrorMessage: String?
   @Published var reprocessDayDate: Date
   @Published var isReprocessingDay = false
   @Published var reprocessStatusMessage: String?
@@ -60,7 +67,12 @@ final class OtherSettingsViewModel: ObservableObject {
     outputLanguageOverride = LLMOutputLanguagePreferences.override
     exportStartDate = timelineDisplayDate(from: Date())
     exportEndDate = timelineDisplayDate(from: Date())
+    togglMappingText = TogglMappingPreferences.mappingText
+    togglRounding = TogglMappingPreferences.rounding
+    togglIncludePersonal = TogglMappingPreferences.includePersonal
+    togglIncludeDistractions = TogglMappingPreferences.includeDistractions
     reprocessDayDate = timelineDisplayDate(from: Date())
+    refreshTogglDraft()
   }
 
   func markOutputLanguageOverrideEdited() {
@@ -174,6 +186,60 @@ final class OtherSettingsViewModel: ObservableObject {
       })
   }
 
+  func saveTogglMappings() {
+    TogglMappingPreferences.mappingText = togglMappingText
+    TogglMappingPreferences.rounding = togglRounding
+    TogglMappingPreferences.includePersonal = togglIncludePersonal
+    TogglMappingPreferences.includeDistractions = togglIncludeDistractions
+    refreshTogglDraft()
+  }
+
+  func resetTogglMappings() {
+    togglMappingText = TogglMappingPreferences.defaultMappingText
+    saveTogglMappings()
+  }
+
+  func refreshTogglDraft() {
+    togglErrorMessage = nil
+    togglStatusMessage = nil
+
+    let start = timelineDisplayDate(from: exportStartDate)
+    let end = timelineDisplayDate(from: exportEndDate)
+    guard start <= end else {
+      togglDraftRows = []
+      togglErrorMessage = "Start date must be on or before end date."
+      return
+    }
+
+    let mappings = TogglMappingParser.parse(togglMappingText)
+    let cards = timelineCards(from: start, through: end)
+    togglDraftRows = TogglDraftExportService.buildRows(
+      from: cards,
+      mappings: mappings,
+      rounding: togglRounding,
+      includePersonal: togglIncludePersonal,
+      includeDistractions: togglIncludeDistractions
+    )
+
+    let exportableCount = togglDraftRows.filter { !$0.isSkipped }.count
+    let skippedCount = togglDraftRows.count - exportableCount
+    togglStatusMessage =
+      "\(exportableCount) exportable entr\(exportableCount == 1 ? "y" : "ies"), \(skippedCount) skipped."
+  }
+
+  func exportTogglDraftCSV() {
+    saveTogglMappings()
+
+    let exportableRows = togglDraftRows.filter { !$0.isSkipped }
+    guard !exportableRows.isEmpty else {
+      togglErrorMessage = "No exportable Toggl rows for this range."
+      return
+    }
+
+    let csv = TogglDraftExportService.makeCSV(rows: togglDraftRows)
+    presentTogglSavePanelAndWrite(csv)
+  }
+
   @MainActor
   private func presentSavePanelAndWrite(
     exportText: String,
@@ -222,6 +288,59 @@ final class OtherSettingsViewModel: ObservableObject {
     } catch {
       exportStatusMessage = nil
       exportErrorMessage = "Couldn't save file: \(error.localizedDescription)"
+    }
+  }
+
+  private func timelineCards(from start: Date, through end: Date) -> [TimelineCard] {
+    let calendar = Calendar.current
+    let dayFormatter = DateFormatter()
+    dayFormatter.dateFormat = "yyyy-MM-dd"
+
+    var cursor = start
+    var cards: [TimelineCard] = []
+    while cursor <= end {
+      cards.append(contentsOf: StorageManager.shared.fetchTimelineCards(forDay: dayFormatter.string(from: cursor)))
+      guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
+      cursor = next
+    }
+    return cards
+  }
+
+  private func presentTogglSavePanelAndWrite(_ csv: String) {
+    let dayFormatter = DateFormatter()
+    dayFormatter.dateFormat = "yyyy-MM-dd"
+    let start = timelineDisplayDate(from: exportStartDate)
+    let end = timelineDisplayDate(from: exportEndDate)
+
+    let savePanel = NSSavePanel()
+    savePanel.title = "Export Toggl draft"
+    savePanel.prompt = "Export"
+    savePanel.nameFieldStringValue =
+      "Dayflow Toggl draft \(dayFormatter.string(from: start)) to \(dayFormatter.string(from: end)).csv"
+    savePanel.allowedContentTypes = [.commaSeparatedText]
+    savePanel.canCreateDirectories = true
+
+    let response = savePanel.runModal()
+    guard response == .OK, let url = savePanel.url else {
+      togglStatusMessage = nil
+      togglErrorMessage = "Toggl export canceled"
+      return
+    }
+
+    do {
+      try csv.write(to: url, atomically: true, encoding: .utf8)
+      togglErrorMessage = nil
+      togglStatusMessage = "Saved Toggl draft to \(url.lastPathComponent)"
+      AnalyticsService.shared.capture(
+        "toggl_draft_exported",
+        [
+          "row_count": togglDraftRows.filter { !$0.isSkipped }.count,
+          "skipped_count": togglDraftRows.filter(\.isSkipped).count,
+          "rounding": togglRounding.rawValue,
+        ])
+    } catch {
+      togglStatusMessage = nil
+      togglErrorMessage = "Couldn't save Toggl draft: \(error.localizedDescription)"
     }
   }
 }
