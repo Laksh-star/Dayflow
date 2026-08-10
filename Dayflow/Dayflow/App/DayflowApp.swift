@@ -6,6 +6,12 @@
 import Sparkle
 import SwiftUI
 
+enum DayflowBuildIdentity {
+  static var isDevBuild: Bool {
+    Bundle.main.bundleIdentifier == "teleportlabs.com.Dayflow.dev"
+  }
+}
+
 struct AppRootView: View {
   @EnvironmentObject private var categoryStore: CategoryStore
   @State private var whatsNewNote: ReleaseNote? = nil
@@ -23,6 +29,7 @@ struct AppRootView: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .onAppear {
+      guard !DayflowBuildIdentity.isDevBuild else { return }
       guard whatsNewNote == nil else { return }
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
         if let note = WhatsNewConfiguration.pendingReleaseForCurrentBuild() {
@@ -33,6 +40,7 @@ struct AppRootView: View {
       }
     }
     .onReceive(NotificationCenter.default.publisher(for: .showWhatsNew)) { _ in
+      guard !DayflowBuildIdentity.isDevBuild else { return }
       guard let release = WhatsNewConfiguration.latestRelease() else { return }
       whatsNewNote = release
       activeWhatsNewVersion = release.version
@@ -263,18 +271,20 @@ struct DayflowApp: App {
 
       // Add Sparkle's update menu item
       CommandGroup(after: .appInfo) {
-        Button("Check for Updates…") {
-          updaterManager.checkForUpdates(showUI: true)
-        }
+        if !DayflowBuildIdentity.isDevBuild {
+          Button("Check for Updates…") {
+            updaterManager.checkForUpdates(showUI: true)
+          }
 
-        Button("View Release Notes") {
-          // Activate the app and bring to foreground
-          NSApp.activate(ignoringOtherApps: true)
+          Button("View Release Notes") {
+            // Activate the app and bring to foreground
+            NSApp.activate(ignoringOtherApps: true)
 
-          // Post notification to show What's New modal
-          NotificationCenter.default.post(name: .showWhatsNew, object: nil)
+            // Post notification to show What's New modal
+            NotificationCenter.default.post(name: .showWhatsNew, object: nil)
+          }
+          .keyboardShortcut("N", modifiers: [.command, .shift])
         }
-        .keyboardShortcut("N", modifiers: [.command, .shift])
       }
     }
     .defaultSize(width: 1200, height: 800)
