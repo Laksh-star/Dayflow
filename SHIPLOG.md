@@ -19,6 +19,11 @@ This file tracks local fork work that may or may not be suitable for upstream Da
   - Personal/distraction exclusion toggles.
   - Exact, 5-minute, or 15-minute rounding.
   - CSV draft export for review/import.
+- Added Toggl draft export v3:
+  - Detailed, consolidated, and summary export modes.
+  - Editable review rows for include/exclude, description, and Toggl project.
+  - CSV export now uses the reviewed rows instead of regenerating hidden defaults.
+  - Consolidation keeps adjacent related Dayflow cards together while summary mode rolls up by day/project.
 
 ## Working Principles
 

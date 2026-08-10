@@ -18,13 +18,38 @@ struct TogglDraftRow: Identifiable, Equatable {
   let end: Date
   let roundedMinutes: Int
   let exactMinutes: Int
-  let description: String
+  var description: String
   let dayflowProject: String
-  let togglProject: String
+  var togglProject: String
   let sourceCardCount: Int
   let skippedReason: String?
+  var isIncluded: Bool
 
-  var isSkipped: Bool { skippedReason != nil }
+  var isSkipped: Bool { skippedReason != nil || !isIncluded }
+  var reviewKey: String {
+    [
+      "\(Int(start.timeIntervalSince1970))",
+      "\(Int(end.timeIntervalSince1970))",
+      dayflowProject,
+      "\(sourceCardCount)",
+    ].joined(separator: "|")
+  }
+}
+
+enum TogglExportMode: String, CaseIterable, Identifiable {
+  case detailed
+  case consolidated
+  case summary
+
+  var id: String { rawValue }
+
+  var label: String {
+    switch self {
+    case .detailed: return "Detailed"
+    case .consolidated: return "Consolidated"
+    case .summary: return "Summary"
+    }
+  }
 }
 
 enum TogglRounding: String, CaseIterable, Identifiable {
@@ -54,6 +79,7 @@ enum TogglRounding: String, CaseIterable, Identifiable {
 enum TogglMappingPreferences {
   private static let mappingKey = "togglV2ProjectMappings"
   private static let roundingKey = "togglV2Rounding"
+  private static let exportModeKey = "togglV3ExportMode"
   private static let includePersonalKey = "togglV2IncludePersonal"
   private static let includeDistractionsKey = "togglV2IncludeDistractions"
 
@@ -83,6 +109,18 @@ enum TogglMappingPreferences {
     }
     set {
       UserDefaults.standard.set(newValue.rawValue, forKey: roundingKey)
+    }
+  }
+
+  static var exportMode: TogglExportMode {
+    get {
+      guard let raw = UserDefaults.standard.string(forKey: exportModeKey),
+        let value = TogglExportMode(rawValue: raw)
+      else { return .consolidated }
+      return value
+    }
+    set {
+      UserDefaults.standard.set(newValue.rawValue, forKey: exportModeKey)
     }
   }
 
@@ -150,6 +188,7 @@ enum TogglDraftExportService {
     from cards: [TimelineCard],
     mappings: [TogglProjectMapping],
     rounding: TogglRounding,
+    mode: TogglExportMode,
     includePersonal: Bool,
     includeDistractions: Bool
   ) -> [TogglDraftRow] {
@@ -163,45 +202,18 @@ enum TogglDraftExportService {
     }
     .sorted { $0.start < $1.start }
 
-    var groups: [DraftGroup] = []
-    for item in items {
-      if var last = groups.popLast() {
-        if last.canMerge(with: item) {
-          last.append(item)
-          groups.append(last)
-        } else {
-          groups.append(last)
-          groups.append(DraftGroup(item: item))
-        }
-      } else {
-        groups.append(DraftGroup(item: item))
-      }
+    let groups: [DraftGroup]
+    switch mode {
+    case .detailed:
+      groups = items.map(DraftGroup.init(item:))
+    case .consolidated:
+      groups = consolidatedGroups(from: items)
+    case .summary:
+      groups = summaryGroups(from: items)
     }
 
     return groups.map { group in
-      let exactMinutes = max(1, Int((group.end.timeIntervalSince(group.start) / 60).rounded()))
-      let roundedMinutes = round(minutes: exactMinutes, rounding: rounding)
-      let description = makeDescription(for: group)
-      let skippedReason: String?
-      if group.isSkipped {
-        skippedReason = "Mapped to SKIP"
-      } else if roundedMinutes < minimumExportMinutes {
-        skippedReason = "Under \(minimumExportMinutes) min"
-      } else {
-        skippedReason = nil
-      }
-
-      return TogglDraftRow(
-        start: group.start,
-        end: group.end,
-        roundedMinutes: roundedMinutes,
-        exactMinutes: exactMinutes,
-        description: description,
-        dayflowProject: group.dayflowProject,
-        togglProject: group.togglProject,
-        sourceCardCount: group.items.count,
-        skippedReason: skippedReason
-      )
+      makeRow(from: group, rounding: rounding, mode: mode)
     }
   }
 
@@ -218,8 +230,8 @@ enum TogglDraftExportService {
       let values = [
         dateFormatter.string(from: row.start),
         timeFormatter.string(from: row.start),
-        dateFormatter.string(from: row.end),
-        timeFormatter.string(from: row.end),
+        dateFormatter.string(from: exportEnd(for: row)),
+        timeFormatter.string(from: exportEnd(for: row)),
         "\(row.roundedMinutes)",
         row.description,
         row.togglProject,
@@ -229,6 +241,81 @@ enum TogglDraftExportService {
       lines.append(values.map(csvEscape).joined(separator: ","))
     }
     return lines.joined(separator: "\n")
+  }
+
+  private static func consolidatedGroups(from items: [DraftItem]) -> [DraftGroup] {
+    var groups: [DraftGroup] = []
+    for item in items {
+      if var last = groups.popLast() {
+        if last.canMerge(with: item) {
+          last.append(item)
+          groups.append(last)
+        } else {
+          groups.append(last)
+          groups.append(DraftGroup(item: item))
+        }
+      } else {
+        groups.append(DraftGroup(item: item))
+      }
+    }
+    return groups
+  }
+
+  private static func summaryGroups(from items: [DraftItem]) -> [DraftGroup] {
+    var groupsByKey: [String: DraftGroup] = [:]
+    let dayFormatter = DateFormatter()
+    dayFormatter.dateFormat = "yyyy-MM-dd"
+
+    for item in items {
+      let key = [
+        dayFormatter.string(from: item.start),
+        item.dayflowProject,
+        item.togglProject,
+        "\(item.isSkipped)",
+      ].joined(separator: "|")
+
+      if var group = groupsByKey[key] {
+        group.appendForSummary(item)
+        groupsByKey[key] = group
+      } else {
+        groupsByKey[key] = DraftGroup(item: item)
+      }
+    }
+    return groupsByKey.values.sorted { lhs, rhs in
+      if lhs.start == rhs.start { return lhs.dayflowProject < rhs.dayflowProject }
+      return lhs.start < rhs.start
+    }
+  }
+
+  private static func makeRow(
+    from group: DraftGroup,
+    rounding: TogglRounding,
+    mode: TogglExportMode
+  ) -> TogglDraftRow {
+    let exactMinutes = max(1, Int((group.totalDuration / 60).rounded()))
+    let roundedMinutes = round(minutes: exactMinutes, rounding: rounding)
+    let description = makeDescription(for: group, mode: mode)
+    let skippedReason: String?
+    if group.isSkipped {
+      skippedReason = "Mapped to SKIP"
+    } else if roundedMinutes < minimumExportMinutes {
+      skippedReason = "Under \(minimumExportMinutes) min"
+    } else {
+      skippedReason = nil
+    }
+
+    return TogglDraftRow(
+      start: group.start,
+      end: group.end,
+      roundedMinutes: roundedMinutes,
+      exactMinutes: exactMinutes,
+      description: description,
+      dayflowProject: group.dayflowProject,
+      togglProject: group.togglProject,
+      sourceCardCount: group.items.count,
+      skippedReason: skippedReason,
+      isIncluded: skippedReason == nil
+    )
   }
 
   private static func makeItem(
@@ -369,9 +456,12 @@ enum TogglDraftExportService {
     return max(increment, Int((Double(minutes) / Double(increment)).rounded()) * increment)
   }
 
-  private static func makeDescription(for group: DraftGroup) -> String {
+  private static func makeDescription(for group: DraftGroup, mode: TogglExportMode) -> String {
     let titles = group.items.map(\.title)
     let first = titles.first ?? "Work block"
+    if mode == .summary {
+      return "\(group.dayflowProject): Daily work summary"
+    }
     guard titles.count > 1 else {
       return "\(group.dayflowProject): \(cleanTitle(first, project: group.dayflowProject))"
     }
@@ -411,6 +501,10 @@ enum TogglDraftExportService {
     return escaped
   }
 
+  private static func exportEnd(for row: TogglDraftRow) -> Date {
+    row.start.addingTimeInterval(TimeInterval(row.roundedMinutes * 60))
+  }
+
   private struct DraftItem {
     var start: Date
     var end: Date
@@ -427,6 +521,7 @@ enum TogglDraftExportService {
     let dayflowProject: String
     let togglProject: String
     var isSkipped: Bool
+    var totalDuration: TimeInterval
 
     init(item: DraftItem) {
       items = [item]
@@ -435,6 +530,7 @@ enum TogglDraftExportService {
       dayflowProject = item.dayflowProject
       togglProject = item.togglProject
       isSkipped = item.isSkipped
+      totalDuration = max(60, item.end.timeIntervalSince(item.start))
     }
 
     func canMerge(with item: DraftItem) -> Bool {
@@ -447,6 +543,14 @@ enum TogglDraftExportService {
     mutating func append(_ item: DraftItem) {
       items.append(item)
       end = max(end, item.end)
+      totalDuration = max(60, end.timeIntervalSince(start))
+    }
+
+    mutating func appendForSummary(_ item: DraftItem) {
+      items.append(item)
+      start = min(start, item.start)
+      end = max(end, item.end)
+      totalDuration += max(60, item.end.timeIntervalSince(item.start))
     }
   }
 }

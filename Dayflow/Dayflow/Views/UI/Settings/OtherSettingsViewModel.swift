@@ -46,6 +46,7 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var exportErrorMessage: String?
   @Published var togglMappingText: String
   @Published var togglRounding: TogglRounding
+  @Published var togglExportMode: TogglExportMode
   @Published var togglIncludePersonal: Bool
   @Published var togglIncludeDistractions: Bool
   @Published var togglDraftRows: [TogglDraftRow] = []
@@ -69,6 +70,7 @@ final class OtherSettingsViewModel: ObservableObject {
     exportEndDate = timelineDisplayDate(from: Date())
     togglMappingText = TogglMappingPreferences.mappingText
     togglRounding = TogglMappingPreferences.rounding
+    togglExportMode = TogglMappingPreferences.exportMode
     togglIncludePersonal = TogglMappingPreferences.includePersonal
     togglIncludeDistractions = TogglMappingPreferences.includeDistractions
     reprocessDayDate = timelineDisplayDate(from: Date())
@@ -189,6 +191,7 @@ final class OtherSettingsViewModel: ObservableObject {
   func saveTogglMappings() {
     TogglMappingPreferences.mappingText = togglMappingText
     TogglMappingPreferences.rounding = togglRounding
+    TogglMappingPreferences.exportMode = togglExportMode
     TogglMappingPreferences.includePersonal = togglIncludePersonal
     TogglMappingPreferences.includeDistractions = togglIncludeDistractions
     refreshTogglDraft()
@@ -213,13 +216,24 @@ final class OtherSettingsViewModel: ObservableObject {
 
     let mappings = TogglMappingParser.parse(togglMappingText)
     let cards = timelineCards(from: start, through: end)
+    let previousRows = togglDraftRows.reduce(into: [String: TogglDraftRow]()) { rows, row in
+      rows[row.reviewKey] = row
+    }
     togglDraftRows = TogglDraftExportService.buildRows(
       from: cards,
       mappings: mappings,
       rounding: togglRounding,
+      mode: togglExportMode,
       includePersonal: togglIncludePersonal,
       includeDistractions: togglIncludeDistractions
-    )
+    ).map { generatedRow in
+      guard let previousRow = previousRows[generatedRow.reviewKey] else { return generatedRow }
+      var row = generatedRow
+      row.description = previousRow.description
+      row.togglProject = previousRow.togglProject
+      row.isIncluded = previousRow.isIncluded && generatedRow.skippedReason == nil
+      return row
+    }
 
     let exportableCount = togglDraftRows.filter { !$0.isSkipped }.count
     let skippedCount = togglDraftRows.count - exportableCount
@@ -236,7 +250,7 @@ final class OtherSettingsViewModel: ObservableObject {
       return
     }
 
-    let csv = TogglDraftExportService.makeCSV(rows: togglDraftRows)
+    let csv = TogglDraftExportService.makeCSV(rows: exportableRows)
     presentTogglSavePanelAndWrite(csv)
   }
 
@@ -337,6 +351,7 @@ final class OtherSettingsViewModel: ObservableObject {
           "row_count": togglDraftRows.filter { !$0.isSkipped }.count,
           "skipped_count": togglDraftRows.filter(\.isSkipped).count,
           "rounding": togglRounding.rawValue,
+          "mode": togglExportMode.rawValue,
         ])
     } catch {
       togglStatusMessage = nil

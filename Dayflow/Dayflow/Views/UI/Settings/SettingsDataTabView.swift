@@ -142,13 +142,21 @@ struct SettingsDataTabView: View {
           )
 
         HStack(alignment: .center, spacing: 10) {
+          Picker("Mode", selection: $viewModel.togglExportMode) {
+            ForEach(TogglExportMode.allCases) { mode in
+              Text(mode.label).tag(mode)
+            }
+          }
+          .pickerStyle(.segmented)
+          .frame(maxWidth: 310)
+
           Picker("Rounding", selection: $viewModel.togglRounding) {
             ForEach(TogglRounding.allCases) { rounding in
               Text(rounding.label).tag(rounding)
             }
           }
           .pickerStyle(.segmented)
-          .frame(maxWidth: 260)
+          .frame(maxWidth: 230)
 
           Toggle("Personal", isOn: $viewModel.togglIncludePersonal)
             .toggleStyle(.checkbox)
@@ -195,6 +203,10 @@ struct SettingsDataTabView: View {
       }
       .onChange(of: viewModel.exportStartDate) { viewModel.refreshTogglDraft() }
       .onChange(of: viewModel.exportEndDate) { viewModel.refreshTogglDraft() }
+      .onChange(of: viewModel.togglExportMode) { viewModel.refreshTogglDraft() }
+      .onChange(of: viewModel.togglRounding) { viewModel.refreshTogglDraft() }
+      .onChange(of: viewModel.togglIncludePersonal) { viewModel.refreshTogglDraft() }
+      .onChange(of: viewModel.togglIncludeDistractions) { viewModel.refreshTogglDraft() }
     }
   }
 
@@ -216,49 +228,71 @@ struct SettingsDataTabView: View {
           .foregroundColor(SettingsStyle.secondary)
       } else {
         VStack(alignment: .leading, spacing: 0) {
-          ForEach(viewModel.togglDraftRows.prefix(12)) { row in
+          HStack(spacing: 10) {
+            Text("Use")
+              .frame(width: 34, alignment: .leading)
+            Text("Description")
+              .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Toggl project")
+              .frame(width: 190, alignment: .leading)
+            Text("Time")
+              .frame(width: 92, alignment: .trailing)
+          }
+          .font(.custom("Figtree", size: 11).weight(.semibold))
+          .foregroundColor(SettingsStyle.meta)
+          .padding(.vertical, 6)
+
+          ForEach($viewModel.togglDraftRows) { row in
             togglDraftRow(row)
-            if row.id != viewModel.togglDraftRows.prefix(12).last?.id {
+            if row.wrappedValue.id != viewModel.togglDraftRows.last?.id {
               Rectangle()
                 .fill(SettingsStyle.divider)
                 .frame(height: 1)
             }
-          }
-
-          if viewModel.togglDraftRows.count > 12 {
-            Text("+ \(viewModel.togglDraftRows.count - 12) more rows")
-              .font(.custom("Figtree", size: 12))
-              .foregroundColor(SettingsStyle.meta)
-              .padding(.top, 8)
           }
         }
       }
     }
   }
 
-  private func togglDraftRow(_ row: TogglDraftRow) -> some View {
-    HStack(alignment: .top, spacing: 12) {
+  private func togglDraftRow(_ row: Binding<TogglDraftRow>) -> some View {
+    let value = row.wrappedValue
+
+    return HStack(alignment: .top, spacing: 10) {
+      Toggle("", isOn: row.isIncluded)
+        .toggleStyle(.checkbox)
+        .labelsHidden()
+        .frame(width: 34, alignment: .leading)
+        .disabled(value.skippedReason != nil)
+
       VStack(alignment: .leading, spacing: 3) {
-        Text(row.description)
+        TextField("Description", text: row.description)
           .font(.custom("Figtree", size: 12).weight(.semibold))
-          .foregroundColor(row.isSkipped ? SettingsStyle.meta : SettingsStyle.text)
-          .lineLimit(2)
-        Text("\(row.dayflowProject) -> \(row.togglProject)")
+          .foregroundColor(value.isSkipped ? SettingsStyle.meta : SettingsStyle.text)
+          .textFieldStyle(.plain)
+        Text(value.dayflowProject)
           .font(.custom("Figtree", size: 11))
           .foregroundColor(SettingsStyle.secondary)
           .lineLimit(1)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
 
-      Spacer(minLength: 10)
+      TextField("Toggl project", text: row.togglProject)
+        .font(.custom("Figtree", size: 12))
+        .foregroundColor(value.isSkipped ? SettingsStyle.meta : SettingsStyle.text)
+        .textFieldStyle(.plain)
+        .frame(width: 190, alignment: .leading)
+        .disabled(value.skippedReason != nil)
 
       VStack(alignment: .trailing, spacing: 3) {
-        Text("\(row.roundedMinutes) min")
+        Text("\(value.roundedMinutes) min")
           .font(.custom("Figtree", size: 12).weight(.semibold))
-          .foregroundColor(row.isSkipped ? SettingsStyle.meta : SettingsStyle.text)
-        Text(row.isSkipped ? (row.skippedReason ?? "Skipped") : "\(row.sourceCardCount) cards")
+          .foregroundColor(value.isSkipped ? SettingsStyle.meta : SettingsStyle.text)
+        Text(value.isSkipped ? (value.skippedReason ?? "Excluded") : "\(value.sourceCardCount) cards")
           .font(.custom("Figtree", size: 11))
-          .foregroundColor(row.isSkipped ? SettingsStyle.destructive : SettingsStyle.meta)
+          .foregroundColor(value.isSkipped ? SettingsStyle.destructive : SettingsStyle.meta)
       }
+      .frame(width: 92, alignment: .trailing)
     }
     .padding(.vertical, 9)
   }
