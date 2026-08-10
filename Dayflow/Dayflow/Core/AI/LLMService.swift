@@ -993,6 +993,7 @@ final class LLMService: LLMServicing {
 
     // Get human-readable error message
     let humanError = getHumanReadableError(error)
+    let failureClassification = TimelineFailureClassifier.classify(error)
 
     // Create the error card
     return TimelineCardShell(
@@ -1004,7 +1005,16 @@ final class LLMService: LLMServicing {
       summary:
         "Failed to process \(duration) minutes of recording from \(startTimeStr) to \(endTimeStr). \(humanError) Your recording is safe and can be reprocessed.",
       detailedSummary:
-        "Error details: \(error.localizedDescription)\n\nThis recording batch (ID: \(batchId)) failed during AI processing. The original video files are preserved and can be reprocessed by retrying from Settings. Common causes include network issues, API rate limits, or temporary service outages.",
+        """
+        Failure kind: \(failureClassification.kind.rawValue)
+        Likely cause: \(humanError)
+        Batch ID: \(batchId)
+        Time range: \(startTimeStr) - \(endTimeStr)
+        Duration: \(duration) minutes
+        Raw error: \(error.localizedDescription)
+
+        The original screenshots are preserved and can be reprocessed with Retry. Common causes include provider configuration issues, API rate limits, network/service outages, privacy-blocked screenshots, or model response parsing errors.
+        """,
       distractions: nil,
       appSites: nil
     )
