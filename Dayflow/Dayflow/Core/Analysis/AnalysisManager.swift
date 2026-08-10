@@ -355,7 +355,16 @@ final class AnalysisManager: AnalysisManaging {
         return
       }
 
-      // Reset batch state and clear observations
+      // Reset batch state and clear previous retry placeholders/cards.
+      // Single-batch retry is usually launched from a failed card; if we keep that card active
+      // until the new card is inserted, the old failure placeholders can survive alongside the
+      // successful card after retry completion.
+      let videoPaths = self.store.deleteTimelineCards(forBatchIds: [batchId])
+      for path in videoPaths {
+        if let url = URL(string: path) {
+          try? FileManager.default.removeItem(at: url)
+        }
+      }
       self.store.deleteObservations(forBatchIds: [batchId])
       let resetBatchIds = Set(self.store.resetBatchStatuses(forBatchIds: [batchId]))
       guard resetBatchIds.contains(batchId) else {
