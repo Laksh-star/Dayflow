@@ -130,6 +130,22 @@ open Dayflow/Dayflow.xcodeproj
 
 Select the Dayflow scheme in Xcode and run it.
 
+## Dayflow Dev Fork Notes
+
+This checkout carries local fork work for `Dayflow Dev` alongside upstream Dayflow.
+
+- Dev app bundle: `/Applications/Dayflow Dev.app`
+- Dev bundle ID: `teleportlabs.com.Dayflow.dev`
+- Dev app support folder: `~/Library/Application Support/DayflowDev/`
+- Dev URL scheme: `dayflow-dev`
+- Repeatable local install:
+
+```bash
+./scripts/install-dev-app.sh
+```
+
+Local fork changes are tracked in [SHIPLOG.md](SHIPLOG.md). Keep upstreamable changes small and separate from personal workflow features.
+
 ## Contributing
 
 Issues and pull requests are welcome. If you are planning a larger change, open an issue first so the scope is clear.
