@@ -5,7 +5,7 @@ final class RetryCoordinator: ObservableObject {
   enum Status: Equatable {
     case queued(position: Int, total: Int)
     case running(step: LLMProcessingStep)
-    case failed
+    case failed(message: String?)
     case stopped
     case done
   }
@@ -25,8 +25,8 @@ final class RetryCoordinator: ObservableObject {
       return "Status: Queued (\(position) of \(total))"
     case .running(let step):
       return "Status: Reprocessing - Step: \(stepLabel(step))\(dots)"
-    case .failed:
-      return "Status: Failed - retry stopped"
+    case .failed(let message):
+      return "Retry failed: \(Self.shortFailureMessage(message))"
     case .stopped:
       return "Status: Stopped - earlier batch failed"
     case .done:
@@ -48,7 +48,10 @@ final class RetryCoordinator: ObservableObject {
     let groupStatuses = batchIds.compactMap { statuses[$0] }
     guard !groupStatuses.isEmpty else { return nil }
 
-    if groupStatuses.contains(.failed) {
+    if groupStatuses.contains(where: { status in
+      if case .failed = status { return true }
+      return false
+    }) {
       return "Status: Failed - retry stopped"
     }
 
@@ -162,8 +165,8 @@ final class RetryCoordinator: ObservableObject {
           self.statuses[batchId] = .done
           onBatchCompleted(batchId)
           self.processNext(index: index + 1, batchIds: batchIds, onBatchCompleted: onBatchCompleted)
-        case .failure:
-          self.statuses[batchId] = .failed
+        case .failure(let error):
+          self.statuses[batchId] = .failed(message: error.localizedDescription)
           self.markRemainingStopped(from: index + 1, batchIds: batchIds)
           self.finishRun()
         }
@@ -212,5 +215,13 @@ final class RetryCoordinator: ObservableObject {
     case .generatingCards:
       return "2/2 Generating cards"
     }
+  }
+
+  private static func shortFailureMessage(_ message: String?) -> String {
+    let trimmed = (message ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return "retry stopped" }
+    let firstLine = trimmed.components(separatedBy: .newlines).first ?? trimmed
+    if firstLine.count <= 96 { return firstLine }
+    return "\(firstLine.prefix(93))..."
   }
 }

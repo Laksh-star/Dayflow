@@ -243,6 +243,10 @@ struct ActivityCard: View {
           .lineLimit(1)
       }
 
+      if isFailedCard(activity) {
+        processingFailureDiagnostics(for: activity)
+      }
+
       if !isFailedCard(activity) {
         if saveAllTimelapsesToDisk, let videoURL = activity.videoSummaryURL {
           VideoThumbnailView(
@@ -419,6 +423,82 @@ struct ActivityCard: View {
       mutable.insert("\n", at: matches[idx].range.location)
     }
     return mutable as String
+  }
+
+  @ViewBuilder
+  private func processingFailureDiagnostics(for activity: TimelineActivity) -> some View {
+    let diagnostics = ProcessingFailureDiagnostics(activity: activity)
+
+    VStack(alignment: .leading, spacing: 10) {
+      HStack(alignment: .center, spacing: 8) {
+        Image(systemName: diagnostics.symbolName)
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundColor(diagnostics.tint)
+          .frame(width: 18)
+
+        VStack(alignment: .leading, spacing: 2) {
+          Text(diagnostics.title)
+            .font(.custom("Figtree", size: 12).weight(.semibold))
+            .foregroundColor(.black)
+          Text(diagnostics.action)
+            .font(.custom("Figtree", size: 11))
+            .foregroundColor(Color(red: 0.38, green: 0.34, blue: 0.3))
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+
+      LazyVGrid(
+        columns: [
+          GridItem(.flexible(minimum: 96), alignment: .leading),
+          GridItem(.flexible(minimum: 96), alignment: .leading),
+        ],
+        alignment: .leading,
+        spacing: 8
+      ) {
+        diagnosticChip(label: "Kind", value: diagnostics.kindLabel)
+        diagnosticChip(label: "Batch", value: diagnostics.batchLabel)
+        diagnosticChip(label: "Source", value: diagnostics.sourceLabel)
+        diagnosticChip(label: "Retry", value: diagnostics.retryLabel)
+      }
+
+      if let rawError = diagnostics.rawError {
+        VStack(alignment: .leading, spacing: 3) {
+          Text("RAW ERROR")
+            .font(.custom("Figtree", size: 10).weight(.semibold))
+            .foregroundColor(Color(red: 0.55, green: 0.48, blue: 0.42))
+          Text(rawError)
+            .font(.custom("Figtree", size: 11))
+            .foregroundColor(Color(red: 0.25, green: 0.2, blue: 0.16))
+            .lineLimit(4)
+            .textSelection(.enabled)
+        }
+      }
+    }
+    .padding(12)
+    .background(Color(red: 1.0, green: 0.96, blue: 0.91).opacity(0.9))
+    .cornerRadius(8)
+    .overlay(
+      RoundedRectangle(cornerRadius: 8)
+        .stroke(Color(red: 0.95, green: 0.78, blue: 0.62), lineWidth: 0.75)
+    )
+  }
+
+  private func diagnosticChip(label: String, value: String) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(label.uppercased())
+        .font(.custom("Figtree", size: 9).weight(.semibold))
+        .foregroundColor(Color(red: 0.58, green: 0.5, blue: 0.43))
+      Text(value)
+        .font(.custom("Figtree", size: 11).weight(.medium))
+        .foregroundColor(Color(red: 0.22, green: 0.18, blue: 0.14))
+        .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(.horizontal, 8)
+    .padding(.vertical, 7)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(Color.white.opacity(0.62))
+    .cornerRadius(6)
   }
 
   private func categoryBadge(for raw: String) -> (name: String, indicator: Color)? {
@@ -670,6 +750,167 @@ struct ActivityCard: View {
         }
       }
     }
+  }
+}
+
+private struct ProcessingFailureDiagnostics {
+  let activity: TimelineActivity
+
+  var title: String {
+    switch category {
+    case .providerConfig: return "Provider configuration issue"
+    case .rateLimit: return "Provider rate limit or quota"
+    case .network: return "Network or provider outage"
+    case .privacyOrSource: return "No usable source screenshots"
+    case .modelResponse: return "Model response could not be parsed"
+    case .timeout: return "Provider timed out"
+    case .unknown: return "Processing failed"
+    }
+  }
+
+  var action: String {
+    switch category {
+    case .providerConfig:
+      return "Check the active provider, API key, and selected model in Settings, then retry this batch."
+    case .rateLimit:
+      return "Wait for the provider limit to reset, or switch to a backup provider before retrying."
+    case .network:
+      return "Check connectivity or provider status. If the provider is healthy, retry the batch."
+    case .privacyOrSource:
+      return "Open Privacy settings and confirm this window was not blocked. Retry only if source screenshots exist."
+    case .modelResponse:
+      return "Retry often fixes this. If it repeats, switch model/provider or lower the batch size later."
+    case .timeout:
+      return "Retry once. If it repeats, the provider may be slow or the batch may be too large."
+    case .unknown:
+      return "Retry once. If it fails again, use the raw error below to decide whether provider settings or privacy rules need attention."
+    }
+  }
+
+  var symbolName: String {
+    switch category {
+    case .providerConfig: return "key.fill"
+    case .rateLimit: return "speedometer"
+    case .network: return "wifi.exclamationmark"
+    case .privacyOrSource: return "eye.slash.fill"
+    case .modelResponse: return "curlybraces"
+    case .timeout: return "clock.badge.exclamationmark"
+    case .unknown: return "exclamationmark.triangle.fill"
+    }
+  }
+
+  var tint: Color {
+    switch category {
+    case .rateLimit, .timeout:
+      return Color(red: 0.86, green: 0.55, blue: 0.08)
+    case .privacyOrSource, .providerConfig:
+      return Color(red: 0.76, green: 0.19, blue: 0.19)
+    case .network, .modelResponse, .unknown:
+      return Color(red: 0.92, green: 0.38, blue: 0.12)
+    }
+  }
+
+  var kindLabel: String {
+    if let value = fieldValue(named: "Failure kind") {
+      return value.replacingOccurrences(of: "_", with: " ")
+    }
+    return category.rawValue
+  }
+
+  var batchLabel: String {
+    if let batchId = activity.batchId {
+      return "#\(batchId)"
+    }
+    if let value = fieldValue(named: "Batch ID") {
+      return "#\(value)"
+    }
+    return "Unknown"
+  }
+
+  var sourceLabel: String {
+    guard let batchId = activity.batchId else { return "Unknown" }
+    let screenshots = StorageManager.shared.screenshotsForBatch(batchId)
+    guard !screenshots.isEmpty else { return "0 screenshots" }
+    let available = screenshots.filter { FileManager.default.fileExists(atPath: $0.filePath) }.count
+    return "\(available)/\(screenshots.count) screenshots"
+  }
+
+  var retryLabel: String {
+    switch category {
+    case .providerConfig, .privacyOrSource: return "Fix first"
+    case .rateLimit: return "Wait or switch"
+    case .network, .modelResponse, .timeout, .unknown: return "Retry ok"
+    }
+  }
+
+  var rawError: String? {
+    if let raw = fieldValue(named: "Raw error") {
+      return raw
+    }
+    if let details = fieldValue(named: "Error details") {
+      return details
+    }
+    let text = combinedText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return nil }
+    return String(text.prefix(700))
+  }
+
+  private var category: FailureCategory {
+    let text = combinedText.lowercased()
+    if text.contains("api key") || text.contains("unauthorized") || text.contains("401")
+      || text.contains("403") || text.contains("not configured")
+      || (text.contains("model") && text.contains("not found"))
+    {
+      return .providerConfig
+    }
+    if text.contains("rate limit") || text.contains("quota") || text.contains("429") {
+      return .rateLimit
+    }
+    if text.contains("timeout") || text.contains("timed out") {
+      return .timeout
+    }
+    if text.contains("network") || text.contains("connection") || text.contains("503")
+      || text.contains("500") || text.contains("service unavailable")
+    {
+      return .network
+    }
+    if text.contains("no screenshots") || text.contains("no video") || text.contains("no data")
+      || text.contains("privacy") || text.contains("blocked")
+    {
+      return .privacyOrSource
+    }
+    if text.contains("json") || text.contains("parse") || text.contains("decode")
+      || text.contains("invalid response") || text.contains("unexpected response")
+      || text.contains("validation")
+    {
+      return .modelResponse
+    }
+    return .unknown
+  }
+
+  private var combinedText: String {
+    "\(activity.summary)\n\(activity.detailedSummary)"
+  }
+
+  private func fieldValue(named name: String) -> String? {
+    let prefix = "\(name):"
+    for line in activity.detailedSummary.components(separatedBy: .newlines) {
+      let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard trimmed.lowercased().hasPrefix(prefix.lowercased()) else { continue }
+      let value = trimmed.dropFirst(prefix.count).trimmingCharacters(in: .whitespacesAndNewlines)
+      if !value.isEmpty { return String(value) }
+    }
+    return nil
+  }
+
+  private enum FailureCategory: String {
+    case providerConfig = "provider config"
+    case rateLimit = "rate limit"
+    case network = "network/service"
+    case privacyOrSource = "source/privacy"
+    case modelResponse = "model response"
+    case timeout
+    case unknown
   }
 }
 
