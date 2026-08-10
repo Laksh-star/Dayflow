@@ -57,9 +57,29 @@ extension OllamaProvider {
     urlRequest.httpMethod = "POST"
     urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
     applyAuthorizationHeader(to: &urlRequest)
-    urlRequest.httpBody = try JSONEncoder().encode(request)
+    urlRequest.httpBody = try encodedRequestBody(request)
     urlRequest.timeoutInterval = timeoutInterval
     return urlRequest
+  }
+
+  private func encodedRequestBody(_ request: ChatRequest) throws -> Data {
+    let body = try JSONEncoder().encode(request)
+    guard usesOpenAICompletionTokenField else { return body }
+    guard
+      var object = try JSONSerialization.jsonObject(with: body) as? [String: Any],
+      let maxTokens = object.removeValue(forKey: "max_tokens")
+    else {
+      return body
+    }
+    object["max_completion_tokens"] = maxTokens
+    return try JSONSerialization.data(withJSONObject: object)
+  }
+
+  private var usesOpenAICompletionTokenField: Bool {
+    guard providerID == .openAICompatible else { return false }
+    let normalizedModel = savedModelId.trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+    return normalizedModel.hasPrefix("gpt-5")
   }
 
   func callChatAPI(
