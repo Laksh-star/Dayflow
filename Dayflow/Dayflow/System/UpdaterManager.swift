@@ -41,6 +41,12 @@ final class UpdaterManager: NSObject, ObservableObject {
   private override init() {
     super.init()
 
+    if Bundle.main.bundleIdentifier == "teleportlabs.com.Dayflow.dev" {
+      statusText = "Updates disabled for Dayflow Dev"
+      print("[Sparkle] disabled for Dayflow Dev")
+      return
+    }
+
     // Print what Sparkle thinks the settings are *before* starting:
     print("[Sparkle] bundleId=\(Bundle.main.bundleIdentifier ?? "nil")")
     print(
