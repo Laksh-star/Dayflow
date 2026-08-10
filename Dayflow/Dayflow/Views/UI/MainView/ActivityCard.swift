@@ -859,6 +859,8 @@ private struct ProcessingFailureDiagnostics {
     let text = combinedText.lowercased()
     if text.contains("api key") || text.contains("unauthorized") || text.contains("401")
       || text.contains("403") || text.contains("not configured")
+      || text.contains("no llm provider") || text.contains("no ai provider")
+      || text.contains("no provider configured")
       || (text.contains("model") && text.contains("not found"))
     {
       return .providerConfig
