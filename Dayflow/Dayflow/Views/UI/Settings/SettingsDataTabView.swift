@@ -121,11 +121,34 @@ struct SettingsDataTabView: View {
     ) {
       VStack(alignment: .leading, spacing: 14) {
         Text(
-          "Mappings use: Dayflow project -> Toggl project | keyword,domain,app. Use SKIP as the Toggl project to exclude matching work."
+          "Mappings use: Dayflow project -> Toggl project | keyword,domain,app. Use SKIP as the Toggl project to exclude matching work. CSV export uses Toggl's import headers."
         )
         .font(.custom("Figtree", size: 12))
         .foregroundColor(SettingsStyle.secondary)
         .fixedSize(horizontal: false, vertical: true)
+
+        VStack(alignment: .leading, spacing: 6) {
+          Text("Toggl email")
+            .font(.custom("Figtree", size: 11))
+            .fontWeight(.semibold)
+            .textCase(.uppercase)
+            .foregroundColor(SettingsStyle.meta)
+
+          TextField("you@example.com", text: $viewModel.togglImportEmail)
+            .font(.custom("Figtree", size: 12))
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.black.opacity(0.035))
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(SettingsStyle.divider, lineWidth: 1)
+            )
+            .frame(maxWidth: 360)
+        }
 
         TextEditor(text: $viewModel.togglMappingText)
           .font(.custom("Figtree", size: 12))

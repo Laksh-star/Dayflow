@@ -25,6 +25,7 @@ This file tracks local fork work that may or may not be suitable for upstream Da
   - CSV export now uses the reviewed rows instead of regenerating hidden defaults.
   - Consolidation keeps adjacent related Dayflow cards together while summary mode rolls up by day/project.
 - Replaced the production Account/Pro/referral settings with a local Dayflow Dev status panel for the dev bundle.
+- Updated Toggl CSV export to use Toggl's import headers and require the Toggl account email.
 
 ## Working Principles
 
