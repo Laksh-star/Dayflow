@@ -46,11 +46,13 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var exportErrorMessage: String?
   @Published var togglMappingText: String
   @Published var togglImportEmail: String
+  @Published var togglKnownProjectsText: String
   @Published var togglRounding: TogglRounding
   @Published var togglExportMode: TogglExportMode
   @Published var togglIncludePersonal: Bool
   @Published var togglIncludeDistractions: Bool
   @Published var togglDraftRows: [TogglDraftRow] = []
+  @Published var togglUnknownProjects: [String] = []
   @Published var togglStatusMessage: String?
   @Published var togglErrorMessage: String?
   @Published var reprocessDayDate: Date
@@ -71,6 +73,7 @@ final class OtherSettingsViewModel: ObservableObject {
     exportEndDate = timelineDisplayDate(from: Date())
     togglMappingText = TogglMappingPreferences.mappingText
     togglImportEmail = TogglMappingPreferences.importEmail
+    togglKnownProjectsText = TogglMappingPreferences.knownProjectsText
     togglRounding = TogglMappingPreferences.rounding
     togglExportMode = TogglMappingPreferences.exportMode
     togglIncludePersonal = TogglMappingPreferences.includePersonal
@@ -193,6 +196,7 @@ final class OtherSettingsViewModel: ObservableObject {
   func saveTogglMappings() {
     TogglMappingPreferences.mappingText = togglMappingText
     TogglMappingPreferences.importEmail = togglImportEmail
+    TogglMappingPreferences.knownProjectsText = togglKnownProjectsText
     TogglMappingPreferences.rounding = togglRounding
     TogglMappingPreferences.exportMode = togglExportMode
     TogglMappingPreferences.includePersonal = togglIncludePersonal
@@ -202,6 +206,7 @@ final class OtherSettingsViewModel: ObservableObject {
 
   func resetTogglMappings() {
     togglMappingText = TogglMappingPreferences.defaultMappingText
+    togglKnownProjectsText = TogglMappingPreferences.knownProjectsText
     saveTogglMappings()
   }
 
@@ -218,6 +223,7 @@ final class OtherSettingsViewModel: ObservableObject {
     }
 
     let mappings = TogglMappingParser.parse(togglMappingText)
+    let knownProjects = TogglProjectCatalog.parse(togglKnownProjectsText)
     let cards = timelineCards(from: start, through: end)
     let previousRows = togglDraftRows.reduce(into: [String: TogglDraftRow]()) { rows, row in
       rows[row.reviewKey] = row
@@ -238,10 +244,22 @@ final class OtherSettingsViewModel: ObservableObject {
       return row
     }
 
+    togglUnknownProjects = TogglProjectCatalog.unknownProjects(
+      rows: togglDraftRows,
+      knownProjects: knownProjects
+    )
+
     let exportableCount = togglDraftRows.filter { !$0.isSkipped }.count
     let skippedCount = togglDraftRows.count - exportableCount
-    togglStatusMessage =
+    let baseStatus =
       "\(exportableCount) exportable entr\(exportableCount == 1 ? "y" : "ies"), \(skippedCount) skipped."
+    if togglUnknownProjects.isEmpty {
+      togglStatusMessage = baseStatus
+    } else {
+      togglStatusMessage = nil
+      togglErrorMessage =
+        "Unknown Toggl projects: \(togglUnknownProjects.joined(separator: ", ")). Add them to Known Toggl projects or update the mappings before export."
+    }
   }
 
   func exportTogglDraftCSV() {
@@ -255,6 +273,11 @@ final class OtherSettingsViewModel: ObservableObject {
     let email = togglImportEmail.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !email.isEmpty else {
       togglErrorMessage = "Enter the Toggl account email used for CSV imports."
+      return
+    }
+    guard togglUnknownProjects.isEmpty else {
+      togglErrorMessage =
+        "Export blocked. Unknown Toggl projects: \(togglUnknownProjects.joined(separator: ", "))."
       return
     }
 

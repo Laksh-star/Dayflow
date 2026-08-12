@@ -81,6 +81,7 @@ enum TogglMappingPreferences {
   private static let roundingKey = "togglV2Rounding"
   private static let exportModeKey = "togglV3ExportMode"
   private static let emailKey = "togglV3ImportEmail"
+  private static let knownProjectsKey = "togglV4KnownProjects"
   private static let includePersonalKey = "togglV2IncludePersonal"
   private static let includeDistractionsKey = "togglV2IncludeDistractions"
 
@@ -133,6 +134,21 @@ enum TogglMappingPreferences {
       UserDefaults.standard.set(
         newValue.trimmingCharacters(in: .whitespacesAndNewlines),
         forKey: emailKey
+      )
+    }
+  }
+
+  static var knownProjectsText: String {
+    get {
+      UserDefaults.standard.string(forKey: knownProjectsKey) ?? """
+        Directing Business Consulting
+        Personal
+        """
+    }
+    set {
+      UserDefaults.standard.set(
+        newValue.trimmingCharacters(in: .whitespacesAndNewlines),
+        forKey: knownProjectsKey
       )
     }
   }
@@ -190,6 +206,43 @@ enum TogglMappingParser {
         destination: destination
       )
     }
+  }
+}
+
+enum TogglProjectCatalog {
+  static func parse(_ text: String) -> [String] {
+    text
+      .components(separatedBy: .newlines)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+  }
+
+  static func unknownProjects(rows: [TogglDraftRow], knownProjects: [String]) -> [String] {
+    let normalizedKnown = Set(
+      knownProjects
+        .map { normalize($0) }
+        .filter { !$0.isEmpty }
+    )
+
+    return Array(
+      Set(
+        rows
+          .filter { !$0.isSkipped }
+          .map(\.togglProject)
+          .filter { !normalize($0).isEmpty && !normalizedKnown.contains(normalize($0)) }
+      )
+    )
+    .sorted()
+  }
+
+  static func isKnownProject(_ project: String, knownProjects: [String]) -> Bool {
+    let normalizedProject = normalize(project)
+    guard !normalizedProject.isEmpty else { return false }
+    return knownProjects.contains { normalize($0) == normalizedProject }
+  }
+
+  private static func normalize(_ value: String) -> String {
+    value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
   }
 }
 
