@@ -45,6 +45,7 @@ final class OtherSettingsViewModel: ObservableObject {
   @Published var exportStatusMessage: String?
   @Published var exportErrorMessage: String?
   @Published var togglMappingText: String
+  @Published var togglImportEmail: String
   @Published var togglRounding: TogglRounding
   @Published var togglExportMode: TogglExportMode
   @Published var togglIncludePersonal: Bool
@@ -69,6 +70,7 @@ final class OtherSettingsViewModel: ObservableObject {
     exportStartDate = timelineDisplayDate(from: Date())
     exportEndDate = timelineDisplayDate(from: Date())
     togglMappingText = TogglMappingPreferences.mappingText
+    togglImportEmail = TogglMappingPreferences.importEmail
     togglRounding = TogglMappingPreferences.rounding
     togglExportMode = TogglMappingPreferences.exportMode
     togglIncludePersonal = TogglMappingPreferences.includePersonal
@@ -190,6 +192,7 @@ final class OtherSettingsViewModel: ObservableObject {
 
   func saveTogglMappings() {
     TogglMappingPreferences.mappingText = togglMappingText
+    TogglMappingPreferences.importEmail = togglImportEmail
     TogglMappingPreferences.rounding = togglRounding
     TogglMappingPreferences.exportMode = togglExportMode
     TogglMappingPreferences.includePersonal = togglIncludePersonal
@@ -249,8 +252,13 @@ final class OtherSettingsViewModel: ObservableObject {
       togglErrorMessage = "No exportable Toggl rows for this range."
       return
     }
+    let email = togglImportEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !email.isEmpty else {
+      togglErrorMessage = "Enter the Toggl account email used for CSV imports."
+      return
+    }
 
-    let csv = TogglDraftExportService.makeCSV(rows: exportableRows)
+    let csv = TogglDraftExportService.makeCSV(rows: exportableRows, email: email)
     presentTogglSavePanelAndWrite(csv)
   }
 

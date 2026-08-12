@@ -80,6 +80,7 @@ enum TogglMappingPreferences {
   private static let mappingKey = "togglV2ProjectMappings"
   private static let roundingKey = "togglV2Rounding"
   private static let exportModeKey = "togglV3ExportMode"
+  private static let emailKey = "togglV3ImportEmail"
   private static let includePersonalKey = "togglV2IncludePersonal"
   private static let includeDistractionsKey = "togglV2IncludeDistractions"
 
@@ -121,6 +122,18 @@ enum TogglMappingPreferences {
     }
     set {
       UserDefaults.standard.set(newValue.rawValue, forKey: exportModeKey)
+    }
+  }
+
+  static var importEmail: String {
+    get {
+      UserDefaults.standard.string(forKey: emailKey) ?? ""
+    }
+    set {
+      UserDefaults.standard.set(
+        newValue.trimmingCharacters(in: .whitespacesAndNewlines),
+        forKey: emailKey
+      )
     }
   }
 
@@ -217,9 +230,9 @@ enum TogglDraftExportService {
     }
   }
 
-  static func makeCSV(rows: [TogglDraftRow]) -> String {
+  static func makeCSV(rows: [TogglDraftRow], email: String) -> String {
     var lines = [
-      "Start date,Start time,End date,End time,Duration minutes,Description,Toggl project,Dayflow project,Source cards"
+      "Email,Client,Project,Task,Description,Billable,Start date,Start time,Duration,Tags"
     ]
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -228,15 +241,16 @@ enum TogglDraftExportService {
 
     for row in rows where !row.isSkipped {
       let values = [
+        email,
+        "",
+        row.togglProject,
+        "",
+        row.description,
+        "No",
         dateFormatter.string(from: row.start),
         timeFormatter.string(from: row.start),
-        dateFormatter.string(from: exportEnd(for: row)),
-        timeFormatter.string(from: exportEnd(for: row)),
-        "\(row.roundedMinutes)",
-        row.description,
-        row.togglProject,
-        row.dayflowProject,
-        "\(row.sourceCardCount)",
+        durationString(minutes: row.roundedMinutes),
+        togglTags(for: row),
       ]
       lines.append(values.map(csvEscape).joined(separator: ","))
     }
@@ -501,8 +515,20 @@ enum TogglDraftExportService {
     return escaped
   }
 
-  private static func exportEnd(for row: TogglDraftRow) -> Date {
-    row.start.addingTimeInterval(TimeInterval(row.roundedMinutes * 60))
+  private static func durationString(minutes: Int) -> String {
+    let hours = minutes / 60
+    let mins = minutes % 60
+    return String(format: "%02d:%02d:00", hours, mins)
+  }
+
+  private static func togglTags(for row: TogglDraftRow) -> String {
+    [
+      "dayflow",
+      row.dayflowProject.replacingOccurrences(of: ",", with: " "),
+      "\(row.sourceCardCount)-cards",
+    ]
+    .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    .joined(separator: ",")
   }
 
   private struct DraftItem {
