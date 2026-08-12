@@ -237,7 +237,7 @@ enum TogglDraftExportService {
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "yyyy-MM-dd"
     let timeFormatter = DateFormatter()
-    timeFormatter.dateFormat = "HH:mm"
+    timeFormatter.dateFormat = "HH:mm:ss"
 
     for row in rows where !row.isSkipped {
       let values = [
