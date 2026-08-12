@@ -150,6 +150,33 @@ struct SettingsDataTabView: View {
             .frame(maxWidth: 360)
         }
 
+        VStack(alignment: .leading, spacing: 6) {
+          Text("Known Toggl projects")
+            .font(.custom("Figtree", size: 11))
+            .fontWeight(.semibold)
+            .textCase(.uppercase)
+            .foregroundColor(SettingsStyle.meta)
+
+          TextEditor(text: $viewModel.togglKnownProjectsText)
+            .font(.custom("Figtree", size: 12))
+            .scrollContentBackground(.hidden)
+            .padding(8)
+            .frame(minHeight: 78, maxHeight: 120)
+            .background(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.black.opacity(0.035))
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(SettingsStyle.divider, lineWidth: 1)
+            )
+
+          Text("One project per line. Export is blocked if a preview row points to a project not listed here.")
+            .font(.custom("Figtree", size: 12))
+            .foregroundColor(SettingsStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+
         TextEditor(text: $viewModel.togglMappingText)
           .font(.custom("Figtree", size: 12))
           .scrollContentBackground(.hidden)
@@ -302,7 +329,11 @@ struct SettingsDataTabView: View {
 
       TextField("Toggl project", text: row.togglProject)
         .font(.custom("Figtree", size: 12))
-        .foregroundColor(value.isSkipped ? SettingsStyle.meta : SettingsStyle.text)
+        .foregroundColor(
+          value.isSkipped
+            ? SettingsStyle.meta
+            : (rowProjectIsKnown(value) ? SettingsStyle.text : SettingsStyle.destructive)
+        )
         .textFieldStyle(.plain)
         .frame(width: 190, alignment: .leading)
         .disabled(value.skippedReason != nil)
@@ -313,7 +344,11 @@ struct SettingsDataTabView: View {
           .foregroundColor(value.isSkipped ? SettingsStyle.meta : SettingsStyle.text)
         Text(value.isSkipped ? (value.skippedReason ?? "Excluded") : "\(value.sourceCardCount) cards")
           .font(.custom("Figtree", size: 11))
-          .foregroundColor(value.isSkipped ? SettingsStyle.destructive : SettingsStyle.meta)
+          .foregroundColor(
+            value.isSkipped
+              ? SettingsStyle.destructive
+              : (rowProjectIsKnown(value) ? SettingsStyle.meta : SettingsStyle.destructive)
+          )
       }
       .frame(width: 92, alignment: .trailing)
     }
@@ -478,6 +513,13 @@ struct SettingsDataTabView: View {
 
   private func formattedTimelineDate(_ date: Date) -> String {
     Self.dateLabelFormatter.string(from: timelineDisplayDate(from: date))
+  }
+
+  private func rowProjectIsKnown(_ row: TogglDraftRow) -> Bool {
+    TogglProjectCatalog.isKnownProject(
+      row.togglProject,
+      knownProjects: TogglProjectCatalog.parse(viewModel.togglKnownProjectsText)
+    )
   }
 
   private func exportDateBinding(for picker: ExportDatePicker) -> Binding<Date> {
