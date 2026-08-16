@@ -156,7 +156,7 @@ struct DayGoalFlowView: View {
   }
 
   private enum Design {
-    static let canvasSize = CGSize(width: 1200, height: 680)
+    static let canvasSize = CGSize(width: 1200, height: 930)
     static let backgroundTop = Color(hex: "FFF3EC")
     static let backgroundBottom = Color(hex: "FF8046").opacity(0.78)
     static let orange = Color(hex: "FF8046")
@@ -250,6 +250,17 @@ struct DayGoalFlowView: View {
         .frame(width: 620, height: 30)
         .position(x: 602, y: 64)
 
+      VStack(alignment: .leading, spacing: 4) {
+        Text("1. Set day targets")
+          .font(.custom("Figtree", size: 13).weight(.semibold))
+          .foregroundColor(Design.text)
+        Text("Choose the categories that count toward Focus and Distraction, then set the total time targets for the day.")
+          .font(.custom("Figtree", size: 11))
+          .foregroundColor(Color(hex: "6C625B"))
+      }
+      .frame(width: 804, alignment: .leading)
+      .position(x: 602, y: 116)
+
       GoalCategoryPool(
         categories: unassignedCategories,
         focusIDs: Set(draft.focusCategories.map(\.categoryID)),
@@ -257,7 +268,7 @@ struct DayGoalFlowView: View {
         onCycle: cycleCategoryAssignment
       )
       .frame(width: 804, height: 87)
-      .position(x: 601.86, y: 171.5)
+      .position(x: 601.86, y: 198.5)
 
       GoalSetupPanel(
         kind: .focus,
@@ -273,7 +284,7 @@ struct DayGoalFlowView: View {
         onDropCategory: { moveCategoryFromDrop($0, to: .focus) }
       )
       .frame(width: 396, height: 321)
-      .position(x: 397.86, y: 384.5)
+      .position(x: 397.86, y: 411.5)
 
       GoalSetupPanel(
         kind: .distraction,
@@ -289,12 +300,32 @@ struct DayGoalFlowView: View {
         onDropCategory: { moveCategoryFromDrop($0, to: .distraction) }
       )
       .frame(width: 400.28, height: 323)
-      .position(x: 804, y: 385.5)
+      .position(x: 804, y: 412.5)
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text("2. Add focus windows (optional)")
+          .font(.custom("Figtree", size: 13).weight(.semibold))
+          .foregroundColor(Design.text)
+        Text("Use windows only when you want Dayflow to compare planned work against drift during specific time blocks.")
+          .font(.custom("Figtree", size: 11))
+          .foregroundColor(Color(hex: "6C625B"))
+      }
+      .frame(width: 804, alignment: .leading)
+      .position(x: 602, y: 585)
+
+      DayFocusWindowEditor(
+        windows: $draft.focusWindows,
+        focusCategories: resolvedSnapshots(for: .focus),
+        onChanged: normalizeFocusWindows
+      )
+      .frame(width: 804)
+      .position(x: 602, y: 718)
 
       HStack(spacing: 10) {
         secondaryButton("Skip today", action: onSkip)
 
         primaryButton("Confirm") {
+          normalizeFocusWindows()
           var plan = draft
           plan.isSkipped = false
           let now = Int(Date().timeIntervalSince1970)
@@ -305,7 +336,7 @@ struct DayGoalFlowView: View {
           onConfirm(plan)
         }
       }
-      .position(x: 607.45, y: 617)
+      .position(x: 607.45, y: 872)
     }
   }
 
@@ -399,6 +430,7 @@ struct DayGoalFlowView: View {
       )
     }
     normalizeSortOrders()
+    normalizeFocusWindows()
   }
 
   private func moveCategory(_ categoryID: String, to kind: DayGoalCategoryKind) {
@@ -448,6 +480,7 @@ struct DayGoalFlowView: View {
       draft.distractionCategories.removeAll { $0.categoryID == categoryID }
     }
     normalizeSortOrders()
+    normalizeFocusWindows()
   }
 
   private func normalizeSortOrders() {
@@ -466,6 +499,25 @@ struct DayGoalFlowView: View {
         colorHex: snapshot.colorHex,
         sortOrder: index
       )
+    }
+  }
+
+  private func normalizeFocusWindows() {
+    let fallbackCategoryIDs = draft.focusCategories.map(\.categoryID)
+    let now = Int(Date().timeIntervalSince1970)
+    draft.focusWindows = draft.focusWindows.enumerated().map { index, window in
+      let trimmedLabel = window.label.trimmingCharacters(in: .whitespacesAndNewlines)
+      let normalized = DayFocusWindow(
+        id: window.id,
+        day: draft.day,
+        startMinutes: window.startMinutes,
+        endMinutes: window.endMinutes,
+        label: trimmedLabel.isEmpty ? "Focus block \(index + 1)" : trimmedLabel,
+        focusCategoryIDs: window.resolvedCategoryIDs(fallbackCategoryIDs: fallbackCategoryIDs),
+        createdAt: window.createdAt > 0 ? window.createdAt : now,
+        updatedAt: now
+      )
+      return normalized
     }
   }
 

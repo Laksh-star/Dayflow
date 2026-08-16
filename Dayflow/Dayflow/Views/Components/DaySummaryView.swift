@@ -59,6 +59,8 @@ struct DaySummaryView: View {
   @State private var cachedTotalCapturedTime: TimeInterval = 0
   @State private var cachedFocusBlocks: [FocusBlock] = []
   @State private var cachedTotalDistractedTime: TimeInterval = 0
+  @State private var focusDriftSnapshot = DayFocusDriftSnapshot.empty
+  @State private var recoveryAnnotationsByEventID: [String: DayRecoveryAnnotation] = [:]
   @State private var reviewSummary = TimelineReviewSummarySnapshot.placeholder
   @State private var dataLoadTask: Task<Void, Never>?
   @State private var reviewLoadTask: Task<Void, Never>?
@@ -205,6 +207,12 @@ struct DaySummaryView: View {
       }
       loadData()
     }
+    .onReceive(NotificationCenter.default.publisher(for: .dayGoalPlanUpdated)) { notification in
+      if let dayString = notification.userInfo?["dayString"] as? String {
+        guard dayString == timelineDayInfo.dayString else { return }
+      }
+      loadData()
+    }
     .onChange(of: categories) {
       recomputeCachedStatsForCategoryChange()
     }
@@ -276,6 +284,12 @@ struct DaySummaryView: View {
         categories: currentCategories)
       let totalDistracted = DaySummaryStats.computeTotalDistractedTime(
         from: precomputed, snapshots: plan.distractionCategories, categories: currentCategories)
+      let focusDrift = DaySummaryStats.makeFocusDriftSnapshot(
+        from: precomputed,
+        plan: plan,
+        categories: currentCategories,
+        referenceTimelineMinute: DaySummaryStats.attentionReferenceTimelineMinute(forDay: dayString)
+      )
       let yesterdayReview = DaySummaryStats.makeGoalReviewSnapshot(
         dayInfo: previousDayInfo,
         storageManager: storageManager,
@@ -311,6 +325,12 @@ struct DaySummaryView: View {
         self.cachedTotalFocusTime = totalFocus
         self.cachedFocusBlocks = blocks
         self.cachedTotalDistractedTime = totalDistracted
+        self.focusDriftSnapshot = focusDrift
+        self.recoveryAnnotationsByEventID = Dictionary(
+          uniqueKeysWithValues: storageManager.fetchRecoveryAnnotations(forDay: dayString).map {
+            ($0.eventID, $0)
+          }
+        )
         self.isLoading = false
         self.hasCompletedInitialLoad = true
         self.reviewSummary = summary
@@ -518,6 +538,7 @@ struct DaySummaryView: View {
     DayFocusSummarySection(
       totalFocusText: formatDurationTitleCase(totalFocusTime),
       focusBlocks: focusBlocks,
+      focusDriftSnapshot: focusDriftSnapshot,
       isSelectionEmpty: isFocusSelectionEmpty,
       categories: selectableCategories,
       selectedCategoryIDs: focusCategoryIDs,
@@ -540,6 +561,8 @@ struct DaySummaryView: View {
       distractedRatio: distractedRatio,
       patternTitle: showDistractionPattern ? (distractionPattern?.title ?? "") : "",
       patternDescription: showDistractionPattern ? (distractionPattern?.description ?? "") : "",
+      focusDriftSnapshot: focusDriftSnapshot,
+      recoveryAnnotationsByEventID: recoveryAnnotationsByEventID,
       isSelectionEmpty: isDistractionSelectionEmpty,
       categories: selectableCategories,
       selectedCategoryIDs: distractionCategoryIDs,
@@ -707,6 +730,11 @@ struct DaySummaryView: View {
     let storageManager = storageManager
     Task.detached(priority: .utility) {
       storageManager.saveDayGoalPlan(normalized)
+      NotificationCenter.default.post(
+        name: .dayGoalPlanUpdated,
+        object: nil,
+        userInfo: ["dayString": normalized.day]
+      )
     }
 
     return (normalized, hadExistingPlan)
@@ -949,6 +977,12 @@ struct DaySummaryView: View {
         categories: currentCategories)
       let totalDistracted = DaySummaryStats.computeTotalDistractedTime(
         from: precomputed, snapshots: plan.distractionCategories, categories: currentCategories)
+      let focusDrift = DaySummaryStats.makeFocusDriftSnapshot(
+        from: precomputed,
+        plan: plan,
+        categories: currentCategories,
+        referenceTimelineMinute: DaySummaryStats.attentionReferenceTimelineMinute(forDay: dayInfo.dayString)
+      )
 
       guard !Task.isCancelled else { return }
 
@@ -960,6 +994,7 @@ struct DaySummaryView: View {
         self.cachedTotalFocusTime = totalFocus
         self.cachedFocusBlocks = blocks
         self.cachedTotalDistractedTime = totalDistracted
+        self.focusDriftSnapshot = focusDrift
         self.categoryStatsTask = nil
       }
     }

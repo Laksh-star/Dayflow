@@ -344,6 +344,7 @@ extension Notification.Name {
   static let navigateToDaily = Notification.Name("navigateToDaily")
   static let navigateToWeekly = Notification.Name("navigateToWeekly")
   static let timelineDataUpdated = Notification.Name("timelineDataUpdated")
+  static let dayGoalPlanUpdated = Notification.Name("dayGoalPlanUpdated")
   static let showTimelineFailureToast = Notification.Name("showTimelineFailureToast")
   static let showScreenRecordingPermissionNotice = Notification.Name(
     "showScreenRecordingPermissionNotice")

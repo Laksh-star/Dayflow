@@ -2,6 +2,26 @@
 
 This file tracks local fork work that may or may not be suitable for upstream Dayflow.
 
+## 2026-08-13
+
+- Added the Focus Drift suite:
+  - Focus windows stored per day for plan-vs-drift analysis.
+  - Plan vs Drift summary card in the day rail.
+  - Recovery Loop analytics for drift-return behavior inside planned windows.
+  - Attention Gradient state derived from recent focus-window context.
+  - Planned-window overlays in the timeline.
+- Extended the day goal setup flow so whole-day targets and optional focus windows live in the same morning setup.
+- Fixed the focus-window editor so a row no longer disappears when editing `Start` or `End`.
+- Clarified the setup UX:
+  - whole-day goals first
+  - optional focus windows second
+  - clearer summary-card copy in the right rail
+  - clearer focus-window toggle guidance and stronger selected/unselected chip states
+  - improved contrast handling for pale category colors in goal/window chips
+- Added `userguide.md` documenting the Dayflow Dev workflow, focus-window semantics, sidebar metrics, and export flow.
+- Added `docs/focus-drift-philosophy.md` documenting the planning model behind Focus Drift.
+- Removed synthetic source-card count tags from Toggl CSV export and kept row counts as preview-only review metadata.
+
 ## 2026-08-10
 
 - Rebased the active fork onto upstream `origin/main` at Dayflow v2.0.3.

@@ -2,6 +2,8 @@ import Foundation
 import GRDB
 
 extension StorageManager {
+  private static let emptyJSONArray = "[]"
+
   func fetchDayGoalPlan(forDay day: String) -> DayGoalPlan? {
     fetchDayGoalPlan(whereSQL: "day = ?", arguments: [day], label: "fetchDayGoalPlan")
   }
@@ -89,10 +91,81 @@ extension StorageManager {
         sql: "DELETE FROM day_goal_categories WHERE day = ?",
         arguments: [plan.day]
       )
+      try db.execute(
+        sql: "DELETE FROM day_focus_windows WHERE day = ?",
+        arguments: [plan.day]
+      )
 
       try insertGoalCategories(plan.focusCategories, kind: .focus, day: plan.day, db: db)
       try insertGoalCategories(
         plan.distractionCategories, kind: .distraction, day: plan.day, db: db)
+      try insertFocusWindows(plan.focusWindows, day: plan.day, db: db)
+    }
+  }
+
+  func fetchRecoveryAnnotations(forDay day: String) -> [DayRecoveryAnnotation] {
+    (try? timedRead("fetchRecoveryAnnotations") { db in
+      try Row.fetchAll(
+        db,
+        sql: """
+              SELECT event_id, day, start_ts, end_ts, trigger_category, recovery_category,
+                     pull_reason, return_reason, created_at, updated_at
+              FROM day_recovery_annotations
+              WHERE day = ?
+              ORDER BY start_ts ASC, updated_at DESC
+          """,
+        arguments: [day]
+      ).map { row in
+        DayRecoveryAnnotation(
+          eventID: row["event_id"],
+          day: row["day"],
+          startTs: row["start_ts"],
+          endTs: row["end_ts"],
+          triggerCategory: row["trigger_category"],
+          recoveryCategory: row["recovery_category"],
+          pullReason: row["pull_reason"],
+          returnReason: row["return_reason"],
+          createdAt: row["created_at"],
+          updatedAt: row["updated_at"]
+        )
+      }
+    }) ?? []
+  }
+
+  func saveRecoveryAnnotation(_ annotation: DayRecoveryAnnotation) {
+    let now = Int(Date().timeIntervalSince1970)
+    let createdAt = annotation.createdAt > 0 ? annotation.createdAt : now
+
+    try? timedWrite("saveRecoveryAnnotation") { db in
+      try db.execute(
+        sql: """
+              INSERT INTO day_recovery_annotations(
+                  event_id, day, start_ts, end_ts, trigger_category, recovery_category,
+                  pull_reason, return_reason, created_at, updated_at
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(event_id, day) DO UPDATE SET
+                  start_ts = excluded.start_ts,
+                  end_ts = excluded.end_ts,
+                  trigger_category = excluded.trigger_category,
+                  recovery_category = excluded.recovery_category,
+                  pull_reason = excluded.pull_reason,
+                  return_reason = excluded.return_reason,
+                  updated_at = excluded.updated_at
+          """,
+        arguments: [
+          annotation.eventID,
+          annotation.day,
+          annotation.startTs,
+          annotation.endTs,
+          annotation.triggerCategory,
+          annotation.recoveryCategory,
+          annotation.pullReason,
+          annotation.returnReason,
+          createdAt,
+          now,
+        ]
+      )
     }
   }
 
@@ -131,6 +204,28 @@ extension StorageManager {
           """,
         arguments: [day]
       )
+      let focusWindows = try Row.fetchAll(
+        db,
+        sql: """
+              SELECT id, day, start_minutes, end_minutes, label, focus_category_ids,
+                     created_at, updated_at
+              FROM day_focus_windows
+              WHERE day = ?
+              ORDER BY start_minutes ASC, updated_at DESC
+          """,
+        arguments: [day]
+      ).compactMap { row -> DayFocusWindow? in
+        DayFocusWindow(
+          id: row["id"],
+          day: row["day"],
+          startMinutes: row["start_minutes"],
+          endMinutes: row["end_minutes"],
+          label: row["label"],
+          focusCategoryIDs: decodeStringArray(row["focus_category_ids"]) ?? [],
+          createdAt: row["created_at"],
+          updatedAt: row["updated_at"]
+        )
+      }
 
       var focusCategories: [DayGoalCategorySnapshot] = []
       var distractionCategories: [DayGoalCategorySnapshot] = []
@@ -162,6 +257,7 @@ extension StorageManager {
         distractionLimitMinutes: row["distraction_limit_minutes"],
         focusCategories: focusCategories,
         distractionCategories: distractionCategories,
+        focusWindows: focusWindows,
         isSkipped: isSkipped != 0,
         createdAt: row["created_at"],
         updatedAt: row["updated_at"]
@@ -192,5 +288,50 @@ extension StorageManager {
           index,
         ])
     }
+  }
+
+  private func insertFocusWindows(
+    _ windows: [DayFocusWindow],
+    day: String,
+    db: Database
+  ) throws {
+    for window in windows.filter(\.isValid) {
+      let createdAt = window.createdAt > 0 ? window.createdAt : Int(Date().timeIntervalSince1970)
+      let updatedAt = window.updatedAt > 0 ? window.updatedAt : createdAt
+      try db.execute(
+        sql: """
+              INSERT INTO day_focus_windows(
+                  id, day, start_minutes, end_minutes, label, focus_category_ids,
+                  created_at, updated_at
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          """,
+        arguments: [
+          window.id,
+          day,
+          window.startMinutes,
+          window.endMinutes,
+          window.label,
+          encodeStringArray(window.focusCategoryIDs),
+          createdAt,
+          updatedAt,
+        ])
+    }
+  }
+
+  private func encodeStringArray(_ values: [String]) -> String {
+    guard let data = try? JSONEncoder().encode(values),
+      let string = String(data: data, encoding: .utf8)
+    else {
+      return Self.emptyJSONArray
+    }
+    return string
+  }
+
+  private func decodeStringArray(_ rawValue: String?) -> [String]? {
+    guard let rawValue, let data = rawValue.data(using: .utf8) else {
+      return nil
+    }
+    return try? JSONDecoder().decode([String].self, from: data)
   }
 }

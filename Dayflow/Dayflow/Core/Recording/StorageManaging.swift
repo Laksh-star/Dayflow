@@ -56,6 +56,8 @@ protocol StorageManaging: Sendable {
   func fetchDayGoalPlan(forDay day: String) -> DayGoalPlan?
   func fetchMostRecentDayGoalPlan(beforeOrOn day: String) -> DayGoalPlan?
   func saveDayGoalPlan(_ plan: DayGoalPlan)
+  func fetchRecoveryAnnotations(forDay day: String) -> [DayRecoveryAnnotation]
+  func saveRecoveryAnnotation(_ annotation: DayRecoveryAnnotation)
 
   func fetchRecentLLMCallsForDebug(limit: Int) -> [LLMCallDebugEntry]
   func fetchRecentAnalysisBatchesForDebug(limit: Int) -> [AnalysisBatchDebugEntry]
