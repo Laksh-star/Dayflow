@@ -73,6 +73,7 @@ struct CanvasTimelineDataView: View {
 
   @State private var selectedCardId: String? = nil
   @State private var positionedActivities: [CanvasPositionedActivity] = []
+  @State private var plannedFocusWindows: [DayFocusWindow] = []
   @State private var recordingProjection: TimelineRecordingProjectionWindow?
   @State private var cardsLayerFrame: CGRect = .zero
   @State private var refreshTimer: Timer?
@@ -142,6 +143,14 @@ struct CanvasTimelineDataView: View {
       .onChange(of: refreshTrigger) { loadActivities() }
       .onChange(of: appState.isRecording) { loadActivities(animate: false) }
       .onChange(of: hourHeight) { loadActivities(animate: false) }
+      .onReceive(NotificationCenter.default.publisher(for: .dayGoalPlanUpdated)) { notification in
+        if let dayString = notification.userInfo?["dayString"] as? String {
+          let currentDayString = DateFormatter.yyyyMMdd.string(
+            from: timelineDisplayDate(from: selectedDate, now: Date()))
+          guard dayString == currentDayString else { return }
+        }
+        loadActivities(animate: false)
+      }
       .onReceive(
         NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
       ) { _ in
@@ -319,6 +328,9 @@ struct CanvasTimelineDataView: View {
             clearSelection()
           }
           .pointingHandCursor(enabled: selectedCardId != nil || selectedActivity != nil)
+
+        plannedFocusWindowsOverlay(in: geo)
+
         ForEach(Array(positionedActivities.enumerated()), id: \.element.id) { index, item in
           let isVisible = cardEntranceProgress[item.id] ?? false
           CanvasActivityCard(
@@ -620,6 +632,7 @@ struct CanvasTimelineDataView: View {
   private func loadActivities(animate: Bool = true) {
     // Cancel any in-flight database read to prevent query pileup
     loadTask?.cancel()
+    let currentCategories = categoryStore.categories
 
     loadTask = Task.detached(priority: .userInitiated) {
       let calendar = Calendar.current
@@ -637,6 +650,12 @@ struct CanvasTimelineDataView: View {
       // card -> activity conversion (same path the Week view uses).
       let payload = TimelineActivityLoader.dayPayload(for: logicalDate)
       let dayString = payload.dayString
+      let focusPlan = DaySummaryStats.carriedForwardGoalPlan(
+        day: dayString,
+        storageManager: StorageManager.shared,
+        categories: currentCategories
+      )
+      let plannedFocusWindows = focusPlan.focusWindows.filter(\.isValid)
 
       // Check for cancellation before expensive processing
       guard !Task.isCancelled else { return }
@@ -702,6 +721,7 @@ struct CanvasTimelineDataView: View {
           self.cardEntranceProgress = [:]
         }
         self.positionedActivities = positioned
+        self.plannedFocusWindows = plannedFocusWindows
         self.recordingProjection = recordingProjection
         self.hasAnyActivities = !positioned.isEmpty
         if let selectedActivity,
@@ -809,6 +829,66 @@ struct CanvasTimelineDataView: View {
 
     let totalMinutes = hoursSince4AM * 60 + minute
     return CGFloat(totalMinutes) * pixelsPerMinute
+  }
+
+  private func timelineMinute(fromClockMinutes minutes: Int) -> Int {
+    let normalizedMinutes = ((minutes % (24 * 60)) + (24 * 60)) % (24 * 60)
+    if normalizedMinutes >= CanvasConfig.startHour * 60 {
+      return normalizedMinutes - (CanvasConfig.startHour * 60)
+    }
+    return normalizedMinutes + ((24 - CanvasConfig.startHour) * 60)
+  }
+
+  private func focusWindowRanges(for window: DayFocusWindow) -> [Range<Int>] {
+    guard window.isValid else { return [] }
+    let start = timelineMinute(fromClockMinutes: window.startMinutes)
+    let end = timelineMinute(fromClockMinutes: window.endMinutes)
+    if start < end {
+      return [start..<end]
+    }
+    return [start..<(24 * 60), 0..<end]
+  }
+
+  @ViewBuilder
+  private func plannedFocusWindowsOverlay(in geo: GeometryProxy) -> some View {
+    ForEach(plannedFocusWindows) { window in
+      let label = window.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        ? "\(formatClockMinutes(window.startMinutes)) - \(formatClockMinutes(window.endMinutes))"
+        : window.label.trimmingCharacters(in: .whitespacesAndNewlines)
+
+      ForEach(Array(focusWindowRanges(for: window).enumerated()), id: \.offset) { index, range in
+        let overlayHeight = max(8, CGFloat(range.count) * pixelsPerMinute - 2)
+        let overlayY = CGFloat(range.lowerBound) * pixelsPerMinute + 1
+
+        RoundedRectangle(cornerRadius: 8)
+          .fill(Color(hex: "628CFF").opacity(0.08))
+          .overlay(
+            RoundedRectangle(cornerRadius: 8)
+              .stroke(Color(hex: "628CFF").opacity(0.20), lineWidth: 1)
+          )
+          .overlay(alignment: .topLeading) {
+            if overlayHeight >= 26, index == 0 {
+              Text(label)
+                .font(.custom("Figtree", size: 10).weight(.medium))
+                .foregroundColor(Color(hex: "4E6CA7"))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+            }
+          }
+          .frame(width: geo.size.width, height: overlayHeight)
+          .position(x: geo.size.width / 2, y: overlayY + (overlayHeight / 2))
+          .allowsHitTesting(false)
+      }
+    }
+  }
+
+  private func formatClockMinutes(_ minutes: Int) -> String {
+    let normalizedMinutes = ((minutes % (24 * 60)) + (24 * 60)) % (24 * 60)
+    let hour24 = normalizedMinutes / 60
+    let minute = normalizedMinutes % 60
+    let period = hour24 >= 12 ? "PM" : "AM"
+    let hour12 = hour24 == 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24)
+    return String(format: "%d:%02d %@", hour12, minute, period)
   }
 
   private func formatHour(_ hour: Int) -> String {

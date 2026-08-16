@@ -65,6 +65,7 @@ Dayflow runs quietly on your Mac and builds a useful record of your day from you
 | Chat with your work journal | Ask natural-language questions about your timeline and recent activity. | You can recover details, explain where time went, and turn raw activity into useful answers. |
 | Weekly review | It aggregates your timeline into focus patterns, categories, app usage, and interaction graphs. | You can see where the week actually went and spot the habits that helped or hurt. |
 | Distraction tracking | Dayflow identifies distracting sessions and shows them alongside focused work. | You can catch drift early without manually labeling every break. |
+| Focus Drift suite | Optional focus windows compare planned work blocks against actual cards, then summarize drift, recovery, and recent attention state. | You can separate whole-day goals from planned deep-work blocks and see where you stayed on plan or recovered after drift. |
 | Timeline export | Export your timeline as Markdown for any date range. | Useful for status updates, client notes, personal reviews, or saving a searchable record. |
 | Local-first storage | Recordings, timeline data, and the app database stay on your Mac by default. | You stay in control of sensitive screen history and can delete it whenever you want. |
 | AI provider choice | Use local models, Gemini, ChatGPT, or Claude depending on your privacy and quality needs. | You can trade off privacy, cost, speed, and summary quality instead of being locked into one backend. |
@@ -143,6 +144,18 @@ This checkout carries local fork work for `Dayflow Dev` alongside upstream Dayfl
 ```bash
 ./scripts/install-dev-app.sh
 ```
+
+Recent fork additions include:
+
+- Markdown export v2 with richer export structure.
+- Toggl draft export with reviewable mappings and grouped rows.
+- Focus Drift suite:
+  - whole-day focus/distraction targets
+  - optional focus windows for plan-vs-drift analysis
+  - recovery analytics for return-to-focus events
+  - attention gradient based on recent focus-window context
+
+See [userguide.md](userguide.md) for the Dayflow Dev workflow and setup details.
 
 Local fork changes are tracked in [SHIPLOG.md](SHIPLOG.md). Keep upstreamable changes small and separate from personal workflow features.
 

@@ -577,11 +577,23 @@ enum TogglDraftExportService {
   private static func togglTags(for row: TogglDraftRow) -> String {
     [
       "dayflow",
-      row.dayflowProject.replacingOccurrences(of: ",", with: " "),
-      "\(row.sourceCardCount)-cards",
+      normalizedProjectTag(row.dayflowProject),
     ]
     .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     .joined(separator: ",")
+  }
+
+  private static func normalizedProjectTag(_ project: String) -> String {
+    project
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+      .replacingOccurrences(of: ",", with: " ")
+      .replacingOccurrences(
+        of: "[^a-z0-9]+",
+        with: "-",
+        options: .regularExpression
+      )
+      .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
   }
 
   private struct DraftItem {

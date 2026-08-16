@@ -262,44 +262,115 @@ struct GoalSetupPanel: View {
   }
 }
 
-private struct GoalCategoryChip: View {
+struct GoalCategoryChip: View {
   enum Status {
     case untracked
     case focus
     case distraction
   }
 
+  enum LeadingAccessory {
+    case dragHandle
+    case selectionIndicator
+    case none
+  }
+
+  enum UntrackedStyle {
+    case tinted
+    case neutral
+  }
+
   let title: String
   let colorHex: String
   let status: Status
   var showsRemove = false
+  var leadingAccessory: LeadingAccessory = .dragHandle
+  var untrackedStyle: UntrackedStyle = .tinted
 
   private var color: Color {
-    if let nsColor = NSColor(hex: colorHex) {
-      return Color(nsColor: nsColor)
+    Color(nsColor: baseNSColor)
+  }
+
+  private var baseNSColor: NSColor {
+    NSColor(hex: colorHex) ?? .systemGray
+  }
+
+  private var accentNSColor: NSColor {
+    let srgb = baseNSColor.usingColorSpace(.sRGB) ?? baseNSColor
+    var red: CGFloat = 0
+    var green: CGFloat = 0
+    var blue: CGFloat = 0
+    var alpha: CGFloat = 0
+    srgb.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+    let brightness = (red * 299 + green * 587 + blue * 114) / 1000
+
+    if brightness > 0.78 {
+      return srgb.blended(withFraction: 0.45, of: .black) ?? srgb
     }
-    return .gray
+    if brightness > 0.62 {
+      return srgb.blended(withFraction: 0.25, of: .black) ?? srgb
+    }
+    return srgb
+  }
+
+  private var accentColor: Color {
+    switch status {
+    case .distraction:
+      return Color(hex: "D65353")
+    case .focus, .untracked:
+      return Color(nsColor: accentNSColor)
+    }
   }
 
   private var background: Color {
     switch status {
     case .focus:
-      return color.opacity(0.16)
+      return accentColor.opacity(0.15)
     case .distraction:
       return Color(hex: "FFEDED")
     case .untracked:
-      return color.opacity(0.16)
+      switch untrackedStyle {
+      case .tinted:
+        return color.opacity(0.16)
+      case .neutral:
+        return Color(hex: "F4F1EE")
+      }
+    }
+  }
+
+  private var titleColor: Color {
+    switch status {
+    case .untracked where untrackedStyle == .neutral:
+      return Color(hex: "5F5A56")
+    default:
+      return Color(hex: "333333")
+    }
+  }
+
+  private var borderColor: Color {
+    switch status {
+    case .focus:
+      return accentColor
+    case .distraction:
+      return Color(hex: "F38F8F")
+    case .untracked:
+      switch untrackedStyle {
+      case .tinted:
+        return accentColor.opacity(0.75)
+      case .neutral:
+        return Color(hex: "D6CFCA")
+      }
     }
   }
 
   var body: some View {
     HStack(spacing: 2) {
-      ChipDragHandle(color: color)
+      leadingAccessoryView
         .frame(width: 16, height: 16)
 
       Text(title)
         .font(.custom("Figtree", size: 12))
-        .foregroundColor(Color(hex: "333333"))
+        .foregroundColor(titleColor)
         .lineLimit(1)
         .minimumScaleFactor(0.8)
 
@@ -314,8 +385,22 @@ private struct GoalCategoryChip: View {
     .clipShape(RoundedRectangle(cornerRadius: 6))
     .overlay(
       RoundedRectangle(cornerRadius: 6)
-        .stroke(color.opacity(status == .untracked ? 0.75 : 1), lineWidth: 0.5)
+        .stroke(borderColor, lineWidth: 0.75)
     )
+  }
+
+  @ViewBuilder
+  private var leadingAccessoryView: some View {
+    switch leadingAccessory {
+    case .dragHandle:
+      ChipDragHandle(color: accentColor)
+    case .selectionIndicator:
+      Image(systemName: status == .focus ? "checkmark.circle.fill" : "circle")
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundColor(status == .focus ? accentColor : Color(hex: "B8B1AB"))
+    case .none:
+      Color.clear
+    }
   }
 }
 
@@ -337,7 +422,7 @@ private struct ChipDragHandle: View {
   }
 }
 
-private struct DayGoalFlowLayout: Layout {
+struct DayGoalFlowLayout: Layout {
   var spacing: CGFloat = 6
   var rowSpacing: CGFloat = 6
 

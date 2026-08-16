@@ -58,6 +58,7 @@ struct DayGoalPlan: Equatable, Sendable {
   var distractionLimitMinutes: Int
   var focusCategories: [DayGoalCategorySnapshot]
   var distractionCategories: [DayGoalCategorySnapshot]
+  var focusWindows: [DayFocusWindow]
   var isSkipped: Bool
   var createdAt: Int
   var updatedAt: Int
@@ -78,6 +79,8 @@ struct DayGoalPlan: Equatable, Sendable {
       copy.updatedAt = 0
     }
     copy.day = day
+    let fallbackCategoryIDs = copy.focusCategories.map(\.categoryID)
+    copy.focusWindows = copy.focusWindows.map { $0.forDay(day, fallbackCategoryIDs: fallbackCategoryIDs) }
     return copy
   }
 
@@ -91,6 +94,10 @@ struct DayGoalPlan: Equatable, Sendable {
       copy.distractionCategories,
       categories: categories
     )
+    let fallbackCategoryIDs = copy.focusCategories.map(\.categoryID)
+    copy.focusWindows = copy.focusWindows
+      .map { $0.forDay(day, fallbackCategoryIDs: fallbackCategoryIDs) }
+      .filter(\.isValid)
     return copy
   }
 
@@ -130,6 +137,7 @@ struct DayGoalPlan: Equatable, Sendable {
       distractionCategories: distraction.enumerated().map { index, category in
         DayGoalCategorySnapshot(category: category, sortOrder: index)
       },
+      focusWindows: [],
       isSkipped: false,
       createdAt: now,
       updatedAt: now

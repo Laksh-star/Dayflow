@@ -616,6 +616,35 @@ final class StorageManager: StorageManaging, @unchecked Sendable {
               );
               CREATE INDEX IF NOT EXISTS idx_day_goal_categories_day_kind
               ON day_goal_categories(day, kind, sort_order);
+
+              CREATE TABLE IF NOT EXISTS day_focus_windows (
+                  id TEXT PRIMARY KEY,
+                  day TEXT NOT NULL,
+                  start_minutes INTEGER NOT NULL,
+                  end_minutes INTEGER NOT NULL,
+                  label TEXT NOT NULL DEFAULT '',
+                  focus_category_ids TEXT NOT NULL DEFAULT '[]',
+                  created_at INTEGER NOT NULL,
+                  updated_at INTEGER NOT NULL
+              );
+              CREATE INDEX IF NOT EXISTS idx_day_focus_windows_day
+              ON day_focus_windows(day, start_minutes, updated_at DESC);
+
+              CREATE TABLE IF NOT EXISTS day_recovery_annotations (
+                  event_id TEXT NOT NULL,
+                  day TEXT NOT NULL,
+                  start_ts INTEGER NOT NULL,
+                  end_ts INTEGER NOT NULL,
+                  trigger_category TEXT NOT NULL,
+                  recovery_category TEXT NOT NULL,
+                  pull_reason TEXT NOT NULL DEFAULT '',
+                  return_reason TEXT NOT NULL DEFAULT '',
+                  created_at INTEGER NOT NULL,
+                  updated_at INTEGER NOT NULL,
+                  PRIMARY KEY (event_id, day)
+              );
+              CREATE INDEX IF NOT EXISTS idx_day_recovery_annotations_day
+              ON day_recovery_annotations(day, updated_at DESC);
           """)
 
       // LLM calls logging table

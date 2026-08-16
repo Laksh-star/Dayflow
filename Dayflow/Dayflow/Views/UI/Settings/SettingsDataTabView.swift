@@ -342,7 +342,11 @@ struct SettingsDataTabView: View {
         Text("\(value.roundedMinutes) min")
           .font(.custom("Figtree", size: 12).weight(.semibold))
           .foregroundColor(value.isSkipped ? SettingsStyle.meta : SettingsStyle.text)
-        Text(value.isSkipped ? (value.skippedReason ?? "Excluded") : "\(value.sourceCardCount) cards")
+        Text(
+          value.isSkipped
+            ? (value.skippedReason ?? "Excluded")
+            : "\(value.sourceCardCount) \(value.sourceCardCount == 1 ? "card" : "cards")"
+        )
           .font(.custom("Figtree", size: 11))
           .foregroundColor(
             value.isSkipped
