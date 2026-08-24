@@ -239,7 +239,9 @@ final class OtherSettingsViewModel: ObservableObject {
       guard let previousRow = previousRows[generatedRow.reviewKey] else { return generatedRow }
       var row = generatedRow
       row.description = previousRow.description
-      row.togglProject = previousRow.togglProject
+      // A mapping refresh must use the newly derived project. Keeping the previous
+      // value here made stale or invalid project names survive after a user fixed
+      // and saved their mapping rules.
       row.isIncluded = previousRow.isIncluded && generatedRow.skippedReason == nil
       return row
     }
