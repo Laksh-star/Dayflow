@@ -48,6 +48,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     AppDelegate.allowTermination = false
     applySavedDockIconPreference()
 
+    if ProcessInfo.processInfo.arguments.contains("--archive-day-shapes") {
+      Task.detached(priority: .utility) {
+        DayShapeService.archiveRecentCompletedDays(storageManager: StorageManager.shared)
+        await MainActor.run {
+          AppDelegate.allowTermination = true
+          NSApp.terminate(nil)
+        }
+      }
+      return
+    }
+
     // Configure crash reporting (Sentry) from shared telemetry preference.
     SentryHelper.setEnabled(AnalyticsService.shared.isOptedIn)
 
@@ -169,6 +180,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Flow desktop overlay (creature toasts/nudges) tracks the session mirror
     FlowOverlayController.shared.start()
+
+    // Archive the latest completed days as compact local JSON + SVG shapes.
+    // The service skips days whose source-card fingerprint has not changed.
+    Task.detached(priority: .utility) {
+      DayShapeService.archiveRecentCompletedDays(storageManager: StorageManager.shared)
+    }
 
     // Observe recording state
     analyticsSub = AppState.shared.$isRecording

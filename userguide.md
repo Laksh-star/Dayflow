@@ -191,6 +191,21 @@ If you rebuild locally, reinstall with:
 ./scripts/install-dev-app.sh
 ```
 
+## Shape of Your Day
+
+On the `Daily` screen, below the workflow sections, `Shape of your day` turns processed timeline cards into two complementary local views.
+
+- `Constellation` is a reflective end-of-day view. Each dot is a captured work interval; dot size represents duration and lines connect related inferred work threads.
+- `Day Trace` places the same intervals across the day, with focus windows shown behind the trace when you planned them.
+
+Threads are inferred from card titles, saved project mappings, app/domain context, and timing. Existing categories are only a fallback, so this is not a category chart or a performance score.
+
+Select a dot to inspect the source card. Shapes update when the underlying cards or focus windows change. Dayflow also archives the seven most recently completed days automatically as JSON and SVG files:
+
+`~/Library/Application Support/DayflowDev/day-shapes/YYYY/MM/YYYY-MM-DD.json`
+
+The SVG beside each JSON file is a compact visual snapshot. These files are local-only and do not trigger an AI request or upload any recording.
+
 ## Further Reading
 
 - [Focus Drift Philosophy](docs/focus-drift-philosophy.md)

@@ -23,6 +23,7 @@ extension DailyView {
           topControls(scale: scale)
           workflowSection(scale: scale, isViewingToday: isViewingToday)
           actionRow(scale: scale)
+          shapeOfDaySection(scale: scale, isViewingToday: isViewingToday)
           highlightsAndTasksSection(
             useSingleColumn: useSingleColumn,
             contentWidth: contentWidth,
@@ -168,6 +169,13 @@ extension DailyView {
       }
     }
   }
+
+  func shapeOfDaySection(scale: CGFloat, isViewingToday: Bool) -> some View {
+    DayShapeOfDaySection(
+      archive: dayShapeArchive,
+      isCurrentDay: isViewingToday
+    )
+  }
   @ViewBuilder
   func workflowTooltipOverlay(
     scale: CGFloat,
@@ -290,6 +298,7 @@ extension DailyView {
     workflowLoadTask = Task.detached(priority: .userInitiated) {
       let cards = StorageManager.shared.fetchTimelineCards(forDay: workflowDay.dayString)
       let computed = computeDailyWorkflow(cards: cards, categories: categorySnapshot)
+      let shape = DayShapeService.archive(for: workflowDay.dayString, storageManager: StorageManager.shared)
 
       guard !Task.isCancelled else { return }
 
@@ -302,6 +311,7 @@ extension DailyView {
         workflowWindow = computed.window
         workflowDistractionMarkers = computed.distractionMarkers
         workflowHasDistractionCategory = computed.hasDistractionCategory
+        dayShapeArchive = shape
       }
     }
   }

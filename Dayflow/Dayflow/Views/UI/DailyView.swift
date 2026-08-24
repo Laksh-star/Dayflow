@@ -20,6 +20,7 @@ struct DailyView: View {
   @State var workflowWindow: DailyWorkflowTimelineWindow = .placeholder
   @State var workflowDistractionMarkers: [DailyWorkflowDistractionMarker] = []
   @State var workflowHasDistractionCategory: Bool = false
+  @State var dayShapeArchive: DayShapeArchive? = nil
   @State var workflowHoveredCellKey: String? = nil
   @State var workflowHoveredDistractionId: String? = nil
   @State var workflowLoadTask: Task<Void, Never>? = nil
