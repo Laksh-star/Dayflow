@@ -154,6 +154,11 @@ Recent fork additions include:
   - optional focus windows for plan-vs-drift analysis
   - recovery analytics for return-to-focus events
   - attention gradient based on recent focus-window context
+- Shape of your day:
+  - local `Constellation` and `Day Trace` views built from processed timeline cards
+  - inferred work threads use card text, project mappings, app/domain context, and time; categories are secondary
+  - completed-day JSON and SVG snapshots saved under `~/Library/Application Support/DayflowDev/day-shapes/`
+  - no additional AI request, screenshot upload, or productivity score
 
 See [userguide.md](userguide.md) for the Dayflow Dev workflow and setup details.
 
