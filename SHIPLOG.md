@@ -9,6 +9,7 @@ This file tracks local fork work that may or may not be suitable for upstream Da
   - Topic threads inferred from timeline content, saved project mappings, app/domain context, and timing rather than relying only on categories.
   - Local JSON and SVG archives for completed days under `~/Library/Application Support/DayflowDev/day-shapes/`.
   - Automatic refresh when processed cards or focus windows change; no extra AI request or screenshot upload.
+- Fixed SVG archive legend serialization and added a format-version refresh so existing local archives regenerate as valid SVG.
 - Created `agent/dayflow-upstream-2026-08-25` at upstream Dayflow v2.1.1 as the dated sync/reference branch. The active custom branch remains separate until an upstream change is deliberately integrated.
 
 ## 2026-08-13

@@ -1,7 +1,7 @@
 import Foundation
 
 struct DayShapeArchive: Codable, Equatable, Sendable {
-  static let algorithmVersion = 1
+  static let algorithmVersion = 3
 
   let algorithmVersion: Int
   let day: String
@@ -317,10 +317,10 @@ enum DayShapeService {
       let radius = min(17, max(5, 4 + sqrt(Double(point.durationMinutes)) * 1.35))
       return "<circle cx=\"\(svgNumber(point.constellationX * width))\" cy=\"\(svgNumber(point.constellationY * height))\" r=\"\(svgNumber(radius))\" fill=\"#\(color)\" stroke=\"#FFFDF9\" stroke-width=\"3\"/>"
     }.joined()
-    let labels = archive.threads.enumerated().map { index, thread in
-      let y = 485.0 + Double(index % 2) * 25
-      let x = 45.0 + Double(index / 2) * 275
-      return "<circle cx=\"\(svgNumber(x))\" cy=\"\(svgNumber(y - 4))\" r=\"5\" fill=\"#\(thread.colorHex)\"/><text x=\"\(svgNumber(x + 11))\" y=\"\(svgNumber(y))\" fill=\"#554A43\" font-family=\"-apple-system, BlinkMacSystemFont, sans-serif\" font-size=\"14\">\(escapeXML(thread.label))</text>"
+    let labels: String = archive.threads.enumerated().map { index, thread -> String in
+      let y: Double = 485.0 + Double(index % 2) * 25.0
+      let x: Double = 45.0 + Double(index / 2) * 275.0
+      return "<circle cx=\"\(svgNumber(x))\" cy=\"\(svgNumber(y - 4.0))\" r=\"5\" fill=\"#\(thread.colorHex)\"/><text x=\"\(svgNumber(x + 11.0))\" y=\"\(svgNumber(y))\" fill=\"#554A43\" font-family=\"-apple-system, BlinkMacSystemFont, sans-serif\" font-size=\"14\">\(escapeXML(thread.label))</text>"
     }.joined()
     return """
       <svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">

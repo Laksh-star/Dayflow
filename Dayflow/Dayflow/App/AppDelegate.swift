@@ -51,6 +51,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     if ProcessInfo.processInfo.arguments.contains("--archive-day-shapes") {
       Task.detached(priority: .utility) {
         DayShapeService.archiveRecentCompletedDays(storageManager: StorageManager.shared)
+        let currentDay = DateFormatter.yyyyMMdd.string(from: timelineDisplayDate(from: Date()))
+        _ = DayShapeService.archive(for: currentDay, storageManager: StorageManager.shared)
         await MainActor.run {
           AppDelegate.allowTermination = true
           NSApp.terminate(nil)
