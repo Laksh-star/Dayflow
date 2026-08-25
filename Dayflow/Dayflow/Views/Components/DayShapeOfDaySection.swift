@@ -53,7 +53,24 @@ struct DayShapeOfDaySection: View {
           case .constellation:
             ConstellationShapeView(archive: archive, selectedPointID: $selectedPointID)
           case .trace:
-            DayTraceShapeView(archive: archive, selectedPointID: $selectedPointID)
+            HStack(alignment: .top, spacing: 16) {
+              VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                  Text("Where those threads appeared")
+                    .font(.custom("InstrumentSerif-Regular", size: 19))
+                    .foregroundStyle(Design.titleColor)
+                  Spacer()
+                  Text("Time stays visible; themes stay consistent")
+                    .font(.custom("Figtree-Regular", size: 10))
+                    .foregroundStyle(Design.subtitleColor)
+                }
+                DayTraceShapeView(archive: archive, selectedPointID: $selectedPointID)
+              }
+              .frame(maxWidth: .infinity)
+
+              DayTraceReadingPanel()
+                .frame(width: 205)
+            }
           }
         }
         .frame(height: 300)
@@ -137,6 +154,53 @@ struct DayShapeOfDaySection: View {
     if hours == 0 { return "\(remainder)m" }
     if remainder == 0 { return "\(hours)h" }
     return "\(hours)h \(remainder)m"
+  }
+}
+
+private struct DayTraceReadingPanel: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("READ THE TRACE")
+        .font(.custom("Figtree-Medium", size: 10))
+        .foregroundStyle(Color(hex: "8B6E5C"))
+        .tracking(1.3)
+        .padding(.bottom, 18)
+
+      section(
+        title: "Focus-window overlay",
+        body: "Planned blocks sit behind the same work cards used in Plan vs Drift."
+      )
+      Divider().padding(.vertical, 14)
+      section(
+        title: "Same topic language",
+        body: "Colors and labels match the Constellation, so changing view never changes the story."
+      )
+      Divider().padding(.vertical, 14)
+      section(
+        title: "No productivity grade",
+        body: "Gaps and switches are evidence for reflection, not failure."
+      )
+      Spacer(minLength: 0)
+    }
+    .padding(14)
+    .background(Color(hex: "FCF7F1"))
+    .overlay(
+      RoundedRectangle(cornerRadius: 6, style: .continuous)
+        .stroke(Color(hex: "E8E1DA"), lineWidth: 1)
+    )
+    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+  }
+
+  private func section(title: String, body: String) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(title)
+        .font(.custom("Figtree-SemiBold", size: 11))
+        .foregroundStyle(Color(hex: "554A43"))
+      Text(body)
+        .font(.custom("Figtree-Regular", size: 10))
+        .foregroundStyle(Color(hex: "7B7068"))
+        .fixedSize(horizontal: false, vertical: true)
+    }
   }
 }
 

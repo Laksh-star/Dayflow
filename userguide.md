@@ -204,7 +204,12 @@ Select a dot to inspect the source card. Shapes update when the underlying cards
 
 `~/Library/Application Support/DayflowDev/day-shapes/YYYY/MM/YYYY-MM-DD.json`
 
-The SVG beside each JSON file is a compact visual snapshot. These files are local-only and do not trigger an AI request or upload any recording.
+Each day saves two compact visual snapshots beside its JSON archive:
+
+- `YYYY-MM-DD-constellation.svg` for the reflective clustered view.
+- `YYYY-MM-DD-day-trace.svg` for the time-ordered view with focus-window overlays.
+
+These files are local-only and do not trigger an AI request or upload any recording.
 
 ## Further Reading
 
