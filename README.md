@@ -157,7 +157,7 @@ Recent fork additions include:
 - Shape of your day:
   - local `Constellation` and `Day Trace` views built from processed timeline cards
   - inferred work threads use card text, project mappings, app/domain context, and time; categories are secondary
-  - completed-day JSON and SVG snapshots saved under `~/Library/Application Support/DayflowDev/day-shapes/`
+  - completed-day JSON plus separate Constellation and Day Trace SVG snapshots saved under `~/Library/Application Support/DayflowDev/day-shapes/`
   - no additional AI request, screenshot upload, or productivity score
 
 See [userguide.md](userguide.md) for the Dayflow Dev workflow and setup details.
