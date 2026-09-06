@@ -2,6 +2,47 @@ import AVFoundation
 import Foundation
 import Speech
 
+struct VoiceTranscriptSegment: Equatable {
+  var start: TimeInterval
+  var duration: TimeInterval
+  var text: String
+}
+
+struct VoiceTranscriptAssembler {
+  private static let timestampTolerance: TimeInterval = 0.08
+  private(set) var segments: [VoiceTranscriptSegment] = []
+
+  var text: String {
+    segments.map(\.text).joined(separator: " ")
+  }
+
+  mutating func reset() {
+    segments.removeAll()
+  }
+
+  mutating func ingest(_ incoming: [VoiceTranscriptSegment]) {
+    for candidate in incoming where !candidate.text.isEmpty {
+      if let index = nearestSegmentIndex(to: candidate.start) {
+        // Partial recognition routinely revises an earlier segment. Replace it
+        // at the same timestamp instead of appending duplicate words.
+        segments[index] = candidate
+      } else {
+        segments.append(candidate)
+      }
+    }
+    segments.sort { $0.start < $1.start }
+  }
+
+  private func nearestSegmentIndex(to timestamp: TimeInterval) -> Int? {
+    guard let candidate = segments.indices.min(by: {
+      abs(segments[$0].start - timestamp) < abs(segments[$1].start - timestamp)
+    }) else {
+      return nil
+    }
+    return abs(segments[candidate].start - timestamp) <= Self.timestampTolerance ? candidate : nil
+  }
+}
+
 /// A local-only voice capability probe. It intentionally has no knowledge of
 /// timeline, task, capture, or provider data.
 @MainActor
@@ -44,6 +85,7 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
   private var recognitionTask: SFSpeechRecognitionTask?
   private var isStarting = false
   private var activeSessionID: UUID?
+  private var transcriptAssembler = VoiceTranscriptAssembler()
 
   var isListening: Bool {
     switch state {
@@ -75,6 +117,7 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
   }
 
   func clearTranscript() {
+    transcriptAssembler.reset()
     transcript = ""
   }
 
@@ -144,6 +187,7 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
 
     audioEngine = engine
     recognitionRequest = request
+    transcriptAssembler.reset()
     transcript = ""
     state = .listening
     let sessionID = UUID()
@@ -154,10 +198,16 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
         guard let self else { return }
         guard self.activeSessionID == sessionID else { return }
         if let result {
-          self.transcript = Self.mergedTranscript(
-            existing: self.transcript,
-            incoming: result.bestTranscription.formattedString
+          self.transcriptAssembler.ingest(
+            result.bestTranscription.segments.map {
+              VoiceTranscriptSegment(
+                start: $0.timestamp,
+                duration: $0.duration,
+                text: Self.normalizedTranscript($0.substring)
+              )
+            }
           )
+          self.transcript = self.transcriptAssembler.text
           if result.isFinal {
             self.finishRecognition(sessionID: sessionID)
             return
@@ -241,38 +291,6 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
         continuation.resume(returning: status)
       }
     }
-  }
-
-  /// macOS normally returns a cumulative best transcription, but on-device
-  /// recognition can emit a fresh segment after a natural pause. Preserve the
-  /// complete push-to-talk turn in both cases without duplicating overlap.
-  static func mergedTranscript(existing: String, incoming: String) -> String {
-    let existing = normalizedTranscript(existing)
-    let incoming = normalizedTranscript(incoming)
-
-    guard !existing.isEmpty else { return incoming }
-    guard !incoming.isEmpty else { return existing }
-    guard existing != incoming else { return existing }
-
-    if incoming.hasPrefix(existing) {
-      return incoming
-    }
-    if existing.hasPrefix(incoming) {
-      return existing
-    }
-
-    let overlapLimit = min(existing.count, incoming.count)
-    if overlapLimit > 0 {
-      for length in stride(from: overlapLimit, through: 1, by: -1) {
-        let suffix = String(existing.suffix(length))
-        let prefix = String(incoming.prefix(length))
-        if suffix.caseInsensitiveCompare(prefix) == .orderedSame {
-          return normalizedTranscript(existing + String(incoming.dropFirst(length)))
-        }
-      }
-    }
-
-    return "\(existing) \(incoming)"
   }
 
   private static func normalizedTranscript(_ text: String) -> String {
