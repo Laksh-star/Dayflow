@@ -170,9 +170,9 @@ Each block is intended to be independently shippable in one focused implementati
 
 **Goal:** Verify macOS push-to-talk transcription, local speech output, permission behavior, and integration with the existing chat/provider pathway.
 
-**Delivers:** A hidden/developer-only voice panel that transcribes one utterance, sends no data until the user submits it, and can speak a fixed local response.
+**Delivers:** A hidden/developer-only voice panel that transcribes one held utterance and can speak its transient transcript. The default mode stays on-device; an explicit `OpenAI high accuracy` mode may submit held audio once to OpenAI's `gpt-transcribe` API after release.
 
-**Done when:** Permission denial is graceful; no audio is persisted; text fallback works; the test does not touch task or timeline data.
+**Done when:** Permission denial is graceful; no audio is persisted; the cloud mode has a clear pre-send disclosure and only accepts a direct `api.openai.com` configuration; text fallback works; the test does not touch task or timeline data.
 
 ### Block 1 - Tasks and manual captures
 

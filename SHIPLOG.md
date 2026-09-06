@@ -6,10 +6,11 @@ This file tracks local fork work that may or may not be suitable for upstream Da
 
 - Added the first Dayflow Personal Assistant prototype block:
   - Dev-only `Voice review prototype` panel in Settings -> Other.
-  - Visible push-to-talk test using on-device macOS speech recognition only.
+  - Visible push-to-talk test with an on-device macOS speech-recognition mode and an explicit OpenAI `gpt-transcribe` high-accuracy mode.
   - Local speech synthesis for reviewing the transient transcript.
   - Microphone and speech permissions are requested only when the test is used.
-  - No audio, transcript, task, timeline, or provider data is persisted or sent to an AI provider.
+  - OpenAI mode only works with a direct `api.openai.com` configuration, clearly discloses the one-time held-audio transfer, and deletes the temporary recording after the request.
+  - No audio, transcript, task, or timeline data is persisted.
 - Added review drafts under `docs/personal-assistant/` for product requirements and technical design, including the staged task/capture, reconciliation, conversation, voice, and mobile-capture plan.
 
 ## 2026-08-25

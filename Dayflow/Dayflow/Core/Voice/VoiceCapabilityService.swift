@@ -43,8 +43,121 @@ struct VoiceTranscriptAssembler {
   }
 }
 
-/// A local-only voice capability probe. It intentionally has no knowledge of
-/// timeline, task, capture, or provider data.
+enum VoiceTranscriptionMode: String, CaseIterable, Identifiable {
+  case onDevice
+  case openAIHighAccuracy
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .onDevice:
+      return "On-device"
+    case .openAIHighAccuracy:
+      return "OpenAI high accuracy"
+    }
+  }
+}
+
+private struct OpenAITranscriptionConfiguration {
+  let endpoint: URL
+  let apiKey: String
+
+  static func load() -> OpenAITranscriptionConfiguration? {
+    guard let configuration = OpenAICompatiblePreferences.load(),
+      let endpoint = audioTranscriptionsURL(from: configuration.baseURL),
+      let apiKey = KeychainManager.shared.retrieve(for: OpenAICompatiblePreferences.keychainProvider)?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !apiKey.isEmpty
+    else {
+      return nil
+    }
+    return OpenAITranscriptionConfiguration(endpoint: endpoint, apiKey: apiKey)
+  }
+
+  static func isDirectOpenAIConfigured() -> Bool {
+    guard let configuration = OpenAICompatiblePreferences.load() else { return false }
+    return audioTranscriptionsURL(from: configuration.baseURL) != nil
+  }
+
+  private static func audioTranscriptionsURL(from baseURL: String) -> URL? {
+    guard var components = URLComponents(string: baseURL.trimmingCharacters(in: .whitespacesAndNewlines)),
+      components.scheme == "https",
+      components.host?.lowercased() == "api.openai.com"
+    else {
+      return nil
+    }
+
+    let path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    let apiPath = path.isEmpty ? "v1" : path
+    components.path = "/\(apiPath)/audio/transcriptions"
+    components.query = nil
+    components.fragment = nil
+    return components.url
+  }
+}
+
+private enum OpenAITranscriptionError: LocalizedError {
+  case invalidResponse
+  case requestFailed(statusCode: Int)
+
+  var errorDescription: String? {
+    switch self {
+    case .invalidResponse:
+      return "OpenAI returned an unreadable transcription response."
+    case .requestFailed(let statusCode):
+      return "OpenAI transcription request failed (HTTP \(statusCode))."
+    }
+  }
+}
+
+private struct OpenAITranscriptionClient {
+  private struct Response: Decodable {
+    let text: String
+  }
+
+  func transcribe(fileURL: URL, configuration: OpenAITranscriptionConfiguration) async throws -> String {
+    let boundary = "DayflowVoice-\(UUID().uuidString)"
+    var request = URLRequest(url: configuration.endpoint)
+    request.httpMethod = "POST"
+    request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
+    request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try multipartBody(fileURL: fileURL, boundary: boundary)
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw OpenAITranscriptionError.invalidResponse
+    }
+    guard (200...299).contains(httpResponse.statusCode) else {
+      throw OpenAITranscriptionError.requestFailed(statusCode: httpResponse.statusCode)
+    }
+    guard let result = try? JSONDecoder().decode(Response.self, from: data) else {
+      throw OpenAITranscriptionError.invalidResponse
+    }
+    return result.text
+  }
+
+  private func multipartBody(fileURL: URL, boundary: String) throws -> Data {
+    let audioData = try Data(contentsOf: fileURL)
+    var body = Data()
+    func append(_ string: String) {
+      body.append(string.data(using: .utf8)!)
+    }
+
+    append("--\(boundary)\r\n")
+    append("Content-Disposition: form-data; name=\"model\"\r\n\r\n")
+    append("gpt-transcribe\r\n")
+    append("--\(boundary)\r\n")
+    append("Content-Disposition: form-data; name=\"file\"; filename=\"voice-review.wav\"\r\n")
+    append("Content-Type: audio/wav\r\n\r\n")
+    body.append(audioData)
+    append("\r\n--\(boundary)--\r\n")
+    return body
+  }
+}
+
+/// A developer-only voice capability probe. It intentionally has no knowledge
+/// of timeline, task, or capture data.
 @MainActor
 final class VoiceCapabilityService: NSObject, ObservableObject {
   enum State: Equatable {
@@ -60,13 +173,13 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     var message: String {
       switch self {
       case .idle:
-        return "Hold the microphone button to test local transcription."
+        return "Hold the microphone button to speak."
       case .requestingPermission:
-        return "Requesting microphone and speech-recognition access..."
+        return "Requesting microphone access..."
       case .ready:
         return "Ready. Hold the microphone button to speak."
       case .listening:
-        return "Listening locally. Release when you finish speaking."
+        return "Listening. Release when you finish speaking."
       case .finishing:
         return "Finishing transcription..."
       case .unavailable(let message), .denied(let message), .failed(let message):
@@ -77,15 +190,22 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
 
   @Published private(set) var state: State = .idle
   @Published private(set) var transcript = ""
+  @Published var transcriptionMode: VoiceTranscriptionMode = .onDevice
 
   private let recognizer = SFSpeechRecognizer(locale: Locale.current)
   private let synthesizer = AVSpeechSynthesizer()
   private var audioEngine: AVAudioEngine?
   private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
   private var recognitionTask: SFSpeechRecognitionTask?
+  private var cloudRecordingURL: URL?
+  private var openAITranscriptionConfiguration: OpenAITranscriptionConfiguration?
   private var isStarting = false
   private var activeSessionID: UUID?
   private var transcriptAssembler = VoiceTranscriptAssembler()
+
+  var hasDirectOpenAIConfiguration: Bool {
+    OpenAITranscriptionConfiguration.isDirectOpenAIConfigured()
+  }
 
   var isListening: Bool {
     switch state {
@@ -100,20 +220,30 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     guard !isStarting, !isListening else { return }
     isStarting = true
     Task {
-      let authorized = await requestRequiredPermissions()
+      let authorized = await requestRequiredPermissions(for: transcriptionMode)
       isStarting = false
       guard authorized else { return }
-      startRecognition()
+      switch transcriptionMode {
+      case .onDevice:
+        startRecognition()
+      case .openAIHighAccuracy:
+        startCloudRecording()
+      }
     }
   }
 
   func stopPressToTalk() {
     guard case .listening = state else { return }
     state = .finishing
-    audioEngine?.stop()
-    audioEngine?.inputNode.removeTap(onBus: 0)
-    recognitionRequest?.endAudio()
-    scheduleFinishFallback(for: activeSessionID)
+    switch transcriptionMode {
+    case .onDevice:
+      audioEngine?.stop()
+      audioEngine?.inputNode.removeTap(onBus: 0)
+      recognitionRequest?.endAudio()
+      scheduleFinishFallback(for: activeSessionID)
+    case .openAIHighAccuracy:
+      finishCloudRecording()
+    }
   }
 
   func clearTranscript() {
@@ -130,13 +260,22 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     synthesizer.speak(utterance)
   }
 
-  private func requestRequiredPermissions() async -> Bool {
+  private func requestRequiredPermissions(for mode: VoiceTranscriptionMode) async -> Bool {
     state = .requestingPermission
 
     let microphoneGranted = await requestMicrophoneAccess()
     guard microphoneGranted else {
-      state = .denied("Microphone access is required for this local test.")
+      state = .denied("Microphone access is required for this test.")
       return false
+    }
+
+    guard mode == .onDevice else {
+      guard let configuration = OpenAITranscriptionConfiguration.load() else {
+        state = .unavailable("OpenAI high accuracy needs a direct api.openai.com provider configuration and API key in Settings.")
+        return false
+      }
+      openAITranscriptionConfiguration = configuration
+      return true
     }
 
     let speechStatus = await requestSpeechAuthorization()
@@ -236,6 +375,99 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     state = .failed("Speech recognition stopped: \(error.localizedDescription)")
   }
 
+  private func startCloudRecording() {
+    let configuration = openAITranscriptionConfiguration
+    tearDownRecognition(cancelTask: true)
+    openAITranscriptionConfiguration = configuration
+
+    let engine = AVAudioEngine()
+    let inputNode = engine.inputNode
+    let format = inputNode.outputFormat(forBus: 0)
+    guard format.sampleRate > 0 else {
+      state = .failed("No microphone input is available. Check System Settings and try again.")
+      return
+    }
+
+    let fileURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("dayflow-voice-\(UUID().uuidString)")
+      .appendingPathExtension("wav")
+    guard let outputFile = try? AVAudioFile(
+      forWriting: fileURL,
+      settings: format.settings,
+      commonFormat: .pcmFormatInt16,
+      interleaved: false
+    ) else {
+      state = .failed("Dayflow could not prepare a temporary audio recording.")
+      return
+    }
+
+    inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+      try? outputFile.write(from: buffer)
+    }
+
+    audioEngine = engine
+    cloudRecordingURL = fileURL
+    transcript = ""
+    transcriptAssembler.reset()
+    state = .listening
+    activeSessionID = UUID()
+
+    do {
+      engine.prepare()
+      try engine.start()
+    } catch {
+      removeCloudRecording()
+      finishWithError(error)
+    }
+  }
+
+  private func finishCloudRecording() {
+    let sessionID = activeSessionID
+    let recordingURL = cloudRecordingURL
+    audioEngine?.stop()
+    audioEngine?.inputNode.removeTap(onBus: 0)
+    audioEngine = nil
+    cloudRecordingURL = nil
+
+    guard let sessionID, let recordingURL else {
+      state = .failed("The temporary audio recording was unavailable.")
+      return
+    }
+
+    Task { [weak self] in
+      defer { try? FileManager.default.removeItem(at: recordingURL) }
+      guard let configuration = self?.openAITranscriptionConfiguration else {
+        await MainActor.run {
+          guard self?.activeSessionID == sessionID else { return }
+          self?.activeSessionID = nil
+          self?.state = .unavailable("OpenAI high accuracy needs a direct api.openai.com provider configuration and API key in Settings.")
+        }
+        return
+      }
+
+      do {
+        let text = try await OpenAITranscriptionClient().transcribe(
+          fileURL: recordingURL,
+          configuration: configuration
+        )
+        await MainActor.run {
+          guard self?.activeSessionID == sessionID else { return }
+          self?.transcript = Self.normalizedTranscript(text)
+          self?.activeSessionID = nil
+          self?.openAITranscriptionConfiguration = nil
+          self?.state = .ready
+        }
+      } catch {
+        await MainActor.run {
+          guard self?.activeSessionID == sessionID else { return }
+          self?.activeSessionID = nil
+          self?.openAITranscriptionConfiguration = nil
+          self?.state = .failed("OpenAI transcription stopped: \(error.localizedDescription)")
+        }
+      }
+    }
+  }
+
   private func finishRecognition(sessionID: UUID) {
     guard activeSessionID == sessionID else { return }
     tearDownRecognition(cancelTask: false)
@@ -264,6 +496,14 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     recognitionRequest = nil
     recognitionTask = nil
     activeSessionID = nil
+    openAITranscriptionConfiguration = nil
+    removeCloudRecording()
+  }
+
+  private func removeCloudRecording() {
+    guard let cloudRecordingURL else { return }
+    try? FileManager.default.removeItem(at: cloudRecordingURL)
+    self.cloudRecordingURL = nil
   }
 
   private func requestMicrophoneAccess() async -> Bool {

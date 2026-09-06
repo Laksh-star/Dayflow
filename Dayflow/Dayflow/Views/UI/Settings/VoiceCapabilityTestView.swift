@@ -11,7 +11,7 @@ struct VoiceCapabilityTestView: View {
           Text("Voice review test")
             .font(.custom("InstrumentSerif", size: 28))
             .foregroundColor(SettingsStyle.text)
-          Text("Developer-only local speech capability check")
+          Text("Developer-only speech capability check")
             .font(.custom("Figtree", size: 13))
             .foregroundColor(SettingsStyle.secondary)
         }
@@ -26,12 +26,31 @@ struct VoiceCapabilityTestView: View {
         .help("Close")
       }
 
+      VStack(alignment: .leading, spacing: 8) {
+        Text("Transcription")
+          .font(.custom("Figtree", size: 12).weight(.semibold))
+          .foregroundColor(SettingsStyle.secondary)
+
+        Picker("Transcription", selection: $voiceService.transcriptionMode) {
+          ForEach(VoiceTranscriptionMode.allCases) { mode in
+            Text(mode.title).tag(mode)
+          }
+        }
+        .pickerStyle(.segmented)
+        .disabled(voiceService.isListening)
+
+        Text(transcriptionDisclosure)
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
       VStack(alignment: .leading, spacing: 10) {
         Text(voiceService.state.message)
           .font(.custom("Figtree", size: 14))
           .foregroundColor(SettingsStyle.text)
 
-        Text("Audio and transcript stay in memory for this test and are discarded when this panel closes.")
+        Text("The transcript stays only in this test panel until you clear it or close the panel.")
           .font(.custom("Figtree", size: 12))
           .foregroundColor(SettingsStyle.secondary)
           .fixedSize(horizontal: false, vertical: true)
@@ -71,6 +90,18 @@ struct VoiceCapabilityTestView: View {
     .padding(28)
     .frame(width: 520)
     .background(Color(hex: "FFFAF5"))
+  }
+
+  private var transcriptionDisclosure: String {
+    switch voiceService.transcriptionMode {
+    case .onDevice:
+      return "On-device recognition keeps held audio on this Mac. It may be less accurate for natural pauses or longer phrases."
+    case .openAIHighAccuracy:
+      if voiceService.hasDirectOpenAIConfiguration {
+        return "When you release, Dayflow sends that held audio once to OpenAI's gpt-transcribe API. The temporary audio file is deleted after the request."
+      }
+      return "Requires a direct api.openai.com provider configuration and API key in Settings. Dayflow will not send audio to another compatible provider."
+    }
   }
 }
 

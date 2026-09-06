@@ -149,7 +149,7 @@ Malformed provider output falls back to plain text with no actionable proposals.
 This service is an adapter around the text conversation service:
 
 1. user holds push-to-talk;
-2. speech is transcribed locally when available;
+2. speech is transcribed on-device by default, or through an explicitly selected cloud transcription mode;
 3. transcript is displayed and can be edited or cancelled;
 4. submitted text goes through `ReviewConversationService`;
 5. response may be spoken with local `AVSpeechSynthesizer`.
@@ -166,11 +166,17 @@ Preferred APIs:
 - `SFSpeechRecognizer` for transcription when authorization and local recognition are available.
 - `AVSpeechSynthesizer` for local spoken output.
 
+Optional high-accuracy transcription:
+
+- The developer prototype may send the held recording to OpenAI's `gpt-transcribe` endpoint only after the user explicitly selects `OpenAI high accuracy`.
+- It reuses a configured direct `https://api.openai.com/v1` endpoint and its existing local Keychain credential. Generic OpenAI-compatible proxies are deliberately rejected for audio upload.
+- The panel discloses this transfer before recording. The temporary WAV is deleted after the request, whether it succeeds or fails.
+
 Fallback behavior:
 
 - microphone denied or speech unavailable: open the same conversation field with typed input;
-- transcription unavailable: show a clear unavailable state, never upload audio to a provider as a fallback;
-- cloud speech transcription is out of scope unless separately approved.
+- transcription unavailable: show a clear unavailable state; never upload audio as an automatic fallback;
+- high-accuracy cloud mode without a direct OpenAI configuration: show a clear configuration state and do not record/send audio.
 
 Permission requests occur only after the user invokes voice. The first release has no background audio session and no wake word.
 
