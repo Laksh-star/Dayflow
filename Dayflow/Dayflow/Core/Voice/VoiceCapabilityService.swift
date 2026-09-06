@@ -403,12 +403,9 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     let fileURL = FileManager.default.temporaryDirectory
       .appendingPathComponent("dayflow-voice-\(UUID().uuidString)")
       .appendingPathExtension("wav")
-    guard let outputFile = try? AVAudioFile(
-      forWriting: fileURL,
-      settings: format.settings,
-      commonFormat: .pcmFormatInt16,
-      interleaved: false
-    ) else {
+    // Keep the file format identical to the microphone tap. AVAudioFile does
+    // not perform an implicit conversion when writing a PCM buffer.
+    guard let outputFile = try? AVAudioFile(forWriting: fileURL, settings: format.settings) else {
       state = .failed("Dayflow could not prepare a temporary audio recording.")
       return
     }
@@ -438,6 +435,7 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
   private func finishCloudRecording() {
     let sessionID = activeSessionID
     let recordingURL = cloudRecordingURL
+    let recordedFrames = cloudOutputFile?.length ?? 0
     audioEngine?.stop()
     audioEngine?.inputNode.removeTap(onBus: 0)
     audioEngine = nil
@@ -447,6 +445,13 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
 
     guard let sessionID, let recordingURL else {
       state = .failed("The temporary audio recording was unavailable.")
+      return
+    }
+    guard recordedFrames > 0 else {
+      try? FileManager.default.removeItem(at: recordingURL)
+      activeSessionID = nil
+      openAITranscriptionConfiguration = nil
+      state = .failed("No microphone audio was captured. Check macOS input levels, then try again.")
       return
     }
 
@@ -468,9 +473,14 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
         )
         await MainActor.run {
           guard self?.activeSessionID == sessionID else { return }
-          self?.transcript = Self.normalizedTranscript(text)
+          let transcript = Self.normalizedTranscript(text)
           self?.activeSessionID = nil
           self?.openAITranscriptionConfiguration = nil
+          guard !transcript.isEmpty else {
+            self?.state = .failed("OpenAI returned no speech. Hold the button while speaking, then try again.")
+            return
+          }
+          self?.transcript = transcript
           self?.state = .ready
         }
       } catch {
