@@ -4,13 +4,42 @@ struct SettingsOtherTabView: View {
   @ObservedObject var viewModel: OtherSettingsViewModel
   @ObservedObject var launchAtLoginManager: LaunchAtLoginManager
   @FocusState private var isOutputLanguageFocused: Bool
+  @State private var showsVoiceCapabilityTest = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: SettingsStyle.sectionSpacing) {
       appPreferencesSection
+#if DEBUG
+      voiceCapabilitySection
+#endif
       outputLanguageSection
     }
+#if DEBUG
+    .sheet(isPresented: $showsVoiceCapabilityTest) {
+      VoiceCapabilityTestView()
+    }
+#endif
   }
+
+#if DEBUG
+  private var voiceCapabilitySection: some View {
+    SettingsSection(
+      title: "Voice review prototype",
+      subtitle: "Tests push-to-talk transcription and local speech output. It does not save audio or send data to an AI provider."
+    ) {
+      SettingsRow(
+        label: "Local speech capability",
+        subtitle: "Requests microphone and speech access only when you open the test."
+      ) {
+        SettingsSecondaryButton(
+          title: "Open test",
+          systemImage: "mic",
+          action: { showsVoiceCapabilityTest = true }
+        )
+      }
+    }
+  }
+#endif
 
   // MARK: - App preferences
 

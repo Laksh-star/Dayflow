@@ -23,8 +23,12 @@
 	<string>$(DAYFLOW_BACKEND_URL)</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Dayflow uses Automation to focus or reopen your agent sessions in the terminal.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Dayflow uses the microphone only when you hold the voice review control. Audio is not saved.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Dayflow uses screen access to create your timeline. Recordings stay on your Mac and you can pause or delete them anytime.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Dayflow transcribes voice review questions locally while you hold the voice review control.</string>
 	<key>PHPostHogApiKey</key>
 	<string>$(POSTHOG_API_KEY)</string>
 	<key>SUAllowsAutomaticUpdates</key>

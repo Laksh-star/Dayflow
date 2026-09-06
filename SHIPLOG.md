@@ -2,6 +2,16 @@
 
 This file tracks local fork work that may or may not be suitable for upstream Dayflow.
 
+## 2026-09-06
+
+- Added the first Dayflow Personal Assistant prototype block:
+  - Dev-only `Voice review prototype` panel in Settings -> Other.
+  - Visible push-to-talk test using on-device macOS speech recognition only.
+  - Local speech synthesis for reviewing the transient transcript.
+  - Microphone and speech permissions are requested only when the test is used.
+  - No audio, transcript, task, timeline, or provider data is persisted or sent to an AI provider.
+- Added review drafts under `docs/personal-assistant/` for product requirements and technical design, including the staged task/capture, reconciliation, conversation, voice, and mobile-capture plan.
+
 ## 2026-08-25
 
 - Added the fork-local `Shape of your day` feature:
