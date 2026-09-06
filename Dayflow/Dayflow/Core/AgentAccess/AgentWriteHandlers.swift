@@ -239,6 +239,7 @@ enum AgentWriteHandlers {
         fromNames: "focus_categories", fallback: existing?.focusCategories ?? []),
       distractionCategories: try snapshots(
         fromNames: "distraction_categories", fallback: existing?.distractionCategories ?? []),
+      focusWindows: existing?.focusWindows ?? [],
       isSkipped: false,
       createdAt: existing?.createdAt ?? 0,
       updatedAt: 0
