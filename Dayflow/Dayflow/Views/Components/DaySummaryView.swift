@@ -50,6 +50,7 @@ struct DaySummaryView: View {
   @State private var yesterdayGoalReview: DayGoalReviewSnapshot?
   @State private var goalSetupReferenceStats = DayGoalSetupReferenceStats.empty
   @State private var handledGoalPromptDay: String?
+  @State private var isShowingDayReview = false
 
   // MARK: - Pre-computed Stats (to avoid expensive parsing during body evaluation)
   // These are computed on background thread when data loads, avoiding main thread hangs
@@ -215,6 +216,13 @@ struct DaySummaryView: View {
     }
     .onChange(of: categories) {
       recomputeCachedStatsForCategoryChange()
+    }
+    .sheet(isPresented: $isShowingDayReview) {
+      DayReviewAssistantView(
+        day: timelineDayInfo.dayString,
+        categories: categories,
+        storageManager: storageManager
+      )
     }
     .contentShape(Rectangle())
     .onTapGesture {
@@ -525,11 +533,16 @@ struct DaySummaryView: View {
   }
 
   private var reviewSection: some View {
-    TimelineReviewSummaryCard(
-      summary: reviewSummary,
-      cardsToReviewCount: cardsToReviewCount,
-      onReviewTap: onReviewTap
-    )
+    VStack(alignment: .leading, spacing: 12) {
+      TimelineReviewSummaryCard(
+        summary: reviewSummary,
+        cardsToReviewCount: cardsToReviewCount,
+        onReviewTap: onReviewTap
+      )
+      Button("Review day") { isShowingDayReview = true }
+        .buttonStyle(.bordered)
+        .font(.custom("Figtree", size: 13).weight(.semibold))
+    }
   }
 
   // MARK: - Focus Section

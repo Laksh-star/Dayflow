@@ -59,6 +59,16 @@ protocol StorageManaging: Sendable {
   func fetchRecoveryAnnotations(forDay day: String) -> [DayRecoveryAnnotation]
   func saveRecoveryAnnotation(_ annotation: DayRecoveryAnnotation)
 
+  // Personal Assistant: tasks and manually captured off-desktop activity.
+  func fetchTasks(forDay day: String) -> [DayflowTask]
+  func saveTask(_ task: DayflowTask)
+  func deleteTask(id: UUID)
+  func fetchManualCaptures(forDay day: String) -> [ManualCapture]
+  func saveManualCapture(_ capture: ManualCapture)
+  func deleteManualCapture(id: UUID)
+  func saveDayReviewDecision(_ decision: DayReviewDecision)
+  func fetchDayReviewDecisions(forDay day: String) -> [DayReviewDecision]
+
   func fetchRecentLLMCallsForDebug(limit: Int) -> [LLMCallDebugEntry]
   func fetchRecentAnalysisBatchesForDebug(limit: Int) -> [AnalysisBatchDebugEntry]
   func fetchLLMCallsForBatches(batchIds: [Int64], limit: Int) -> [LLMCallDebugEntry]

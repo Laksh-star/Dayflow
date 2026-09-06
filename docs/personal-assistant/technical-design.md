@@ -1,6 +1,6 @@
 # Dayflow Personal Assistant - Technical Design
 
-**Status:** Draft for review  
+**Status:** Initial local storage and review workspace implemented; follow-up work will deepen mobile import and provider-backed answers.
 **Companion:** [Product Requirements](requirements.md)
 
 ## 1. Architecture Position

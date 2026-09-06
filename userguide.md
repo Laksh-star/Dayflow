@@ -1,5 +1,16 @@
 # Dayflow Dev User Guide
 
+## Review Day: tasks, manual captures, and voice
+
+Open the right-side day summary and choose **Review day**. This is the local workspace for closing the loop between what you intended, what Dayflow observed on the desktop, and activity it could not observe.
+
+- **Tasks** are small intentions for the selected day. Marking one done, deferring it, or deleting it is always manual.
+- **Manual captures** record meetings, offline work, personal activity, or notes. Add a time range only when you know it; an untimed capture remains a note rather than becoming invented tracked time.
+- **Review** suggestions compare task wording with the day's desktop cards. They are suggestions, not automatic completion.
+- **Ask about this day** answers from the selected day's local tasks, captures, and desktop cards. Hold the microphone button to transcribe a question, review the transcript in the field, then choose **Ask**. The current answer is grounded locally and can be spoken with the Mac's system voice.
+
+The developer Voice review prototype under Settings -> Other remains available to diagnose transcription separately. It supports on-device and explicitly selected OpenAI high-accuracy transcription; the latter submits only the held recording after release and removes the temporary audio file after transcription.
+
 This guide covers the fork-specific workflow in `Dayflow Dev`.
 
 ## Morning Setup

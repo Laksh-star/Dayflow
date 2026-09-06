@@ -264,7 +264,11 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
   }
 
   func speakTranscript() {
-    let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+    speak(text: transcript)
+  }
+
+  func speak(text: String) {
+    let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
     synthesizer.stopSpeaking(at: .immediate)
     let utterance = AVSpeechUtterance(string: text)

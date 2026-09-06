@@ -646,6 +646,53 @@ final class StorageManager: StorageManaging, @unchecked Sendable {
               );
               CREATE INDEX IF NOT EXISTS idx_day_recovery_annotations_day
               ON day_recovery_annotations(day, updated_at DESC);
+
+              CREATE TABLE IF NOT EXISTS dayflow_tasks (
+                  id TEXT PRIMARY KEY,
+                  title TEXT NOT NULL,
+                  status TEXT NOT NULL CHECK(status IN ('inbox','planned','in_progress','done','deferred','dropped')),
+                  created_day TEXT NOT NULL,
+                  planned_day TEXT,
+                  category_id TEXT,
+                  project_name TEXT,
+                  estimate_minutes INTEGER,
+                  notes TEXT NOT NULL DEFAULT '',
+                  created_at INTEGER NOT NULL,
+                  updated_at INTEGER NOT NULL,
+                  completed_at INTEGER
+              );
+              CREATE INDEX IF NOT EXISTS idx_dayflow_tasks_planned_status
+              ON dayflow_tasks(planned_day, status, updated_at DESC);
+
+              CREATE TABLE IF NOT EXISTS manual_captures (
+                  id TEXT PRIMARY KEY,
+                  day TEXT NOT NULL,
+                  body TEXT NOT NULL,
+                  kind TEXT NOT NULL CHECK(kind IN ('offline_work','meeting','personal','note')),
+                  start_ts INTEGER,
+                  end_ts INTEGER,
+                  category_id TEXT,
+                  project_name TEXT,
+                  task_id TEXT,
+                  source TEXT NOT NULL CHECK(source IN ('desktop','mobile_shortcut','review','conversation')),
+                  source_payload TEXT,
+                  created_at INTEGER NOT NULL,
+                  updated_at INTEGER NOT NULL,
+                  CHECK(end_ts IS NULL OR start_ts IS NULL OR end_ts > start_ts)
+              );
+              CREATE INDEX IF NOT EXISTS idx_manual_captures_day_time
+              ON manual_captures(day, start_ts, created_at);
+
+              CREATE TABLE IF NOT EXISTS day_review_decisions (
+                  id TEXT PRIMARY KEY,
+                  day TEXT NOT NULL,
+                  task_id TEXT,
+                  kind TEXT NOT NULL,
+                  payload_json TEXT NOT NULL DEFAULT '{}',
+                  created_at INTEGER NOT NULL
+              );
+              CREATE INDEX IF NOT EXISTS idx_day_review_decisions_day
+              ON day_review_decisions(day, created_at);
           """)
 
       // LLM calls logging table

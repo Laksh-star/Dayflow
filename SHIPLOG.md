@@ -4,6 +4,12 @@ This file tracks local fork work that may or may not be suitable for upstream Da
 
 ## 2026-09-06
 
+- Added the first integrated Personal Assistant workspace:
+  - local tasks, manual captures, and review decisions stored separately from automated timeline cards;
+  - a **Review day** sheet from the day-summary rail for task entry, offline/manual capture, evidence suggestions, and a day-scoped question surface;
+  - voice transcription reused in the review composer, with transcript preview before asking and optional local speech output;
+  - Markdown exports now append structured Tasks, Manual captures, and Review decisions sections when data exists.
+
 - Added the first Dayflow Personal Assistant prototype block:
   - Dev-only `Voice review prototype` panel in Settings -> Other.
   - Visible push-to-talk test with an on-device macOS speech-recognition mode and an explicit OpenAI `gpt-transcribe` high-accuracy mode.

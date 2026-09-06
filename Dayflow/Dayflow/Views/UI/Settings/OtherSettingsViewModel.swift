@@ -137,7 +137,13 @@ final class OtherSettingsViewModel: ObservableObject {
         let dayString = dayFormatter.string(from: cursor)
         let cards = StorageManager.shared.fetchTimelineCards(forDay: dayString)
         totalActivities += cards.count
-        let section = TimelineClipboardFormatter.makeMarkdown(for: cursor, cards: cards)
+        let baseSection = TimelineClipboardFormatter.makeMarkdown(for: cursor, cards: cards)
+        let section = PersonalAssistantMarkdown.append(
+          to: baseSection,
+          tasks: StorageManager.shared.fetchTasks(forDay: dayString),
+          captures: StorageManager.shared.fetchManualCaptures(forDay: dayString),
+          decisions: StorageManager.shared.fetchDayReviewDecisions(forDay: dayString)
+        )
         sections.append(section)
         dayCount += 1
 

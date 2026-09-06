@@ -1,6 +1,6 @@
 # Dayflow Personal Assistant - Product Requirements
 
-**Status:** Draft for review  
+**Status:** Implemented initial integrated workspace; follow-up work will deepen mobile import and provider-backed answers.
 **Audience:** Dayflow Dev fork  
 **Principle:** Dayflow is a private work-memory and reflection product. It is not a generic task manager or an always-listening assistant.
 
