@@ -98,11 +98,14 @@ private struct OpenAITranscriptionConfiguration {
 }
 
 private enum OpenAITranscriptionError: LocalizedError {
+  case emptyRecording
   case invalidResponse
   case requestFailed(statusCode: Int)
 
   var errorDescription: String? {
     switch self {
+    case .emptyRecording:
+      return "The microphone recording was empty. Hold the button while speaking, then try again."
     case .invalidResponse:
       return "OpenAI returned an unreadable transcription response."
     case .requestFailed(let statusCode):
@@ -123,8 +126,13 @@ private struct OpenAITranscriptionClient {
     request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
     request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
     request.httpBody = try multipartBody(fileURL: fileURL, boundary: boundary)
+    request.timeoutInterval = 25
 
-    let (data, response) = try await URLSession.shared.data(for: request)
+    let sessionConfiguration = URLSessionConfiguration.ephemeral
+    sessionConfiguration.timeoutIntervalForRequest = 25
+    sessionConfiguration.timeoutIntervalForResource = 35
+    let session = URLSession(configuration: sessionConfiguration)
+    let (data, response) = try await session.data(for: request)
     guard let httpResponse = response as? HTTPURLResponse else {
       throw OpenAITranscriptionError.invalidResponse
     }
@@ -139,6 +147,9 @@ private struct OpenAITranscriptionClient {
 
   private func multipartBody(fileURL: URL, boundary: String) throws -> Data {
     let audioData = try Data(contentsOf: fileURL)
+    guard !audioData.isEmpty else {
+      throw OpenAITranscriptionError.emptyRecording
+    }
     var body = Data()
     func append(_ string: String) {
       body.append(string.data(using: .utf8)!)
@@ -198,6 +209,7 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
   private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
   private var recognitionTask: SFSpeechRecognitionTask?
   private var cloudRecordingURL: URL?
+  private var cloudOutputFile: AVAudioFile?
   private var openAITranscriptionConfiguration: OpenAITranscriptionConfiguration?
   private var isStarting = false
   private var activeSessionID: UUID?
@@ -407,6 +419,7 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
 
     audioEngine = engine
     cloudRecordingURL = fileURL
+    cloudOutputFile = outputFile
     transcript = ""
     transcriptAssembler.reset()
     state = .listening
@@ -416,6 +429,7 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
       engine.prepare()
       try engine.start()
     } catch {
+      cloudOutputFile = nil
       removeCloudRecording()
       finishWithError(error)
     }
@@ -427,6 +441,8 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     audioEngine?.stop()
     audioEngine?.inputNode.removeTap(onBus: 0)
     audioEngine = nil
+    // Releasing the file before reading it flushes the WAV header and final frames.
+    cloudOutputFile = nil
     cloudRecordingURL = nil
 
     guard let sessionID, let recordingURL else {
@@ -462,7 +478,7 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
           guard self?.activeSessionID == sessionID else { return }
           self?.activeSessionID = nil
           self?.openAITranscriptionConfiguration = nil
-          self?.state = .failed("OpenAI transcription stopped: \(error.localizedDescription)")
+          self?.state = .failed(Self.openAIErrorMessage(for: error))
         }
       }
     }
@@ -497,6 +513,7 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     recognitionTask = nil
     activeSessionID = nil
     openAITranscriptionConfiguration = nil
+    cloudOutputFile = nil
     removeCloudRecording()
   }
 
@@ -537,5 +554,12 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     text
       .split(whereSeparator: { $0.isWhitespace })
       .joined(separator: " ")
+  }
+
+  private static func openAIErrorMessage(for error: Error) -> String {
+    if let urlError = error as? URLError, urlError.code == .timedOut {
+      return "OpenAI transcription timed out. Check your connection, then try a short 3-5 second recording."
+    }
+    return "OpenAI transcription stopped: \(error.localizedDescription)"
   }
 }

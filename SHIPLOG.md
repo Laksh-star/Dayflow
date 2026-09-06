@@ -11,6 +11,7 @@ This file tracks local fork work that may or may not be suitable for upstream Da
   - Microphone and speech permissions are requested only when the test is used.
   - OpenAI mode only works with a direct `api.openai.com` configuration, clearly discloses the one-time held-audio transfer, and deletes the temporary recording after the request.
   - No audio, transcript, task, or timeline data is persisted.
+  - Fixed the OpenAI voice-upload handoff to flush and close the temporary WAV before the request, with short bounded network timeouts and clearer retry guidance.
 - Added review drafts under `docs/personal-assistant/` for product requirements and technical design, including the staged task/capture, reconciliation, conversation, voice, and mobile-capture plan.
 
 ## 2026-08-25
