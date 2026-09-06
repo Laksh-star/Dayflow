@@ -11,6 +11,7 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     case requestingPermission
     case ready
     case listening
+    case finishing
     case unavailable(String)
     case denied(String)
     case failed(String)
@@ -25,6 +26,8 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
         return "Ready. Hold the microphone button to speak."
       case .listening:
         return "Listening locally. Release when you finish speaking."
+      case .finishing:
+        return "Finishing transcription..."
       case .unavailable(let message), .denied(let message), .failed(let message):
         return message
       }
@@ -40,12 +43,15 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
   private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
   private var recognitionTask: SFSpeechRecognitionTask?
   private var isStarting = false
+  private var activeSessionID: UUID?
 
   var isListening: Bool {
-    if case .listening = state {
+    switch state {
+    case .listening, .finishing:
       return true
+    default:
+      return false
     }
-    return false
   }
 
   func startPressToTalk() {
@@ -60,11 +66,12 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
   }
 
   func stopPressToTalk() {
-    guard isListening else { return }
+    guard case .listening = state else { return }
+    state = .finishing
     audioEngine?.stop()
     audioEngine?.inputNode.removeTap(onBus: 0)
     recognitionRequest?.endAudio()
-    state = .ready
+    scheduleFinishFallback(for: activeSessionID)
   }
 
   func clearTranscript() {
@@ -116,14 +123,13 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
   private func startRecognition() {
     guard let recognizer else { return }
 
-    recognitionTask?.cancel()
-    audioEngine?.stop()
-    audioEngine?.inputNode.removeTap(onBus: 0)
+    tearDownRecognition(cancelTask: true)
 
     let engine = AVAudioEngine()
     let request = SFSpeechAudioBufferRecognitionRequest()
     request.shouldReportPartialResults = true
     request.requiresOnDeviceRecognition = true
+    request.taskHint = .dictation
 
     let inputNode = engine.inputNode
     let format = inputNode.outputFormat(forBus: 0)
@@ -140,15 +146,26 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
     recognitionRequest = request
     transcript = ""
     state = .listening
+    let sessionID = UUID()
+    activeSessionID = sessionID
 
     recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
       Task { @MainActor [weak self] in
         guard let self else { return }
+        guard self.activeSessionID == sessionID else { return }
         if let result {
           self.transcript = result.bestTranscription.formattedString
+          if result.isFinal {
+            self.finishRecognition(sessionID: sessionID)
+            return
+          }
         }
-        if let error, self.isListening {
-          self.finishWithError(error)
+        if let error {
+          if case .finishing = self.state {
+            self.finishRecognition(sessionID: sessionID)
+          } else {
+            self.finishWithError(error)
+          }
         }
       }
     }
@@ -162,11 +179,38 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
   }
 
   private func finishWithError(_ error: Error) {
+    tearDownRecognition(cancelTask: true)
+    state = .failed("Speech recognition stopped: \(error.localizedDescription)")
+  }
+
+  private func finishRecognition(sessionID: UUID) {
+    guard activeSessionID == sessionID else { return }
+    tearDownRecognition(cancelTask: false)
+    state = .ready
+  }
+
+  private func scheduleFinishFallback(for sessionID: UUID?) {
+    guard let sessionID else { return }
+    Task { [weak self] in
+      try? await Task.sleep(for: .seconds(2))
+      guard !Task.isCancelled else { return }
+      guard let self, self.activeSessionID == sessionID else { return }
+      guard case .finishing = self.state else { return }
+      self.finishRecognition(sessionID: sessionID)
+    }
+  }
+
+  private func tearDownRecognition(cancelTask: Bool) {
     audioEngine?.stop()
     audioEngine?.inputNode.removeTap(onBus: 0)
     recognitionRequest?.endAudio()
-    recognitionTask?.cancel()
-    state = .failed("Speech recognition stopped: \(error.localizedDescription)")
+    if cancelTask {
+      recognitionTask?.cancel()
+    }
+    audioEngine = nil
+    recognitionRequest = nil
+    recognitionTask = nil
+    activeSessionID = nil
   }
 
   private func requestMicrophoneAccess() async -> Bool {

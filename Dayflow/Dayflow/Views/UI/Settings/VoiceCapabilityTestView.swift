@@ -92,10 +92,17 @@ private struct VoicePressToTalkButton: View {
         .fill(service.isListening ? Color.red.opacity(0.85) : SettingsStyle.ink)
     )
     .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    .gesture(
-      DragGesture(minimumDistance: 0)
-        .onChanged { _ in service.startPressToTalk() }
-        .onEnded { _ in service.stopPressToTalk() }
+    .onLongPressGesture(
+      minimumDuration: .infinity,
+      maximumDistance: .infinity,
+      pressing: { isPressing in
+        if isPressing {
+          service.startPressToTalk()
+        } else {
+          service.stopPressToTalk()
+        }
+      },
+      perform: {}
     )
     .accessibilityLabel("Hold to talk")
     .accessibilityHint("Hold while speaking, then release to finish")
