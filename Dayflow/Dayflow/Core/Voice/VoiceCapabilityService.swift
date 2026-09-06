@@ -154,7 +154,10 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
         guard let self else { return }
         guard self.activeSessionID == sessionID else { return }
         if let result {
-          self.transcript = result.bestTranscription.formattedString
+          self.transcript = Self.mergedTranscript(
+            existing: self.transcript,
+            incoming: result.bestTranscription.formattedString
+          )
           if result.isFinal {
             self.finishRecognition(sessionID: sessionID)
             return
@@ -238,5 +241,43 @@ final class VoiceCapabilityService: NSObject, ObservableObject {
         continuation.resume(returning: status)
       }
     }
+  }
+
+  /// macOS normally returns a cumulative best transcription, but on-device
+  /// recognition can emit a fresh segment after a natural pause. Preserve the
+  /// complete push-to-talk turn in both cases without duplicating overlap.
+  static func mergedTranscript(existing: String, incoming: String) -> String {
+    let existing = normalizedTranscript(existing)
+    let incoming = normalizedTranscript(incoming)
+
+    guard !existing.isEmpty else { return incoming }
+    guard !incoming.isEmpty else { return existing }
+    guard existing != incoming else { return existing }
+
+    if incoming.hasPrefix(existing) {
+      return incoming
+    }
+    if existing.hasPrefix(incoming) {
+      return existing
+    }
+
+    let overlapLimit = min(existing.count, incoming.count)
+    if overlapLimit > 0 {
+      for length in stride(from: overlapLimit, through: 1, by: -1) {
+        let suffix = String(existing.suffix(length))
+        let prefix = String(incoming.prefix(length))
+        if suffix.caseInsensitiveCompare(prefix) == .orderedSame {
+          return normalizedTranscript(existing + String(incoming.dropFirst(length)))
+        }
+      }
+    }
+
+    return "\(existing) \(incoming)"
+  }
+
+  private static func normalizedTranscript(_ text: String) -> String {
+    text
+      .split(whereSeparator: { $0.isWhitespace })
+      .joined(separator: " ")
   }
 }
