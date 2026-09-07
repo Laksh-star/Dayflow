@@ -58,6 +58,7 @@ enum WeeklyInteractionGraphGlyph {
   case burst
   case bullseye
   case bars
+  case symbol(String, backgroundHex: String, foregroundHex: String)
   case asset(String)
   case monogram(String, backgroundHex: String, foregroundHex: String)
 }

@@ -408,6 +408,68 @@ struct WeeklyApplicationInteractionsSnapshot {
   )
 }
 
+extension WeeklyApplicationInteractionsSnapshot {
+  var graphSnapshot: WeeklyInteractionGraphSnapshot {
+    let graphNodes = nodes.map { node in
+      WeeklyInteractionGraphNode(
+        id: node.id,
+        title: node.name,
+        category: node.kind.graphCategory,
+        glyph: WeeklyInteractionGraphGlyph.liveAppGlyph(for: node.name),
+        importanceBoost: node.isPrimary ? 0.5 : (node.isMuted ? -0.05 : 0)
+      )
+    }
+    let graphEdges = edges.map { edge in
+      WeeklyInteractionGraphEdge(
+        id: "\(edge.from)-\(edge.to)",
+        sourceID: edge.from,
+        targetID: edge.to,
+        weight: CGFloat(edge.weight)
+      )
+    }
+    return WeeklyInteractionGraphSnapshot(
+      title: "Interactions between most used applications",
+      subtitle: subtitle,
+      nodes: graphNodes,
+      edges: graphEdges,
+      preferredCenterNodeID: nodes.first(where: \.isPrimary)?.id
+    )
+  }
+}
+
+private extension WeeklyApplicationKind {
+  var graphCategory: WeeklyInteractionGraphCategory {
+    switch self {
+    case .work: return .work
+    case .personal: return .personal
+    case .distraction: return .distraction
+    }
+  }
+}
+
+private extension WeeklyInteractionGraphGlyph {
+  static func liveAppGlyph(for name: String) -> WeeklyInteractionGraphGlyph {
+    let normalized = name.lowercased()
+    if normalized.contains("slack") { return .slack }
+    if normalized.contains("youtube") { return .youtube }
+    if normalized == "x" || normalized.contains("twitter") { return .x }
+    if normalized.contains("notion") { return .notion }
+    if normalized.contains("zoom") { return .zoom }
+    if normalized.contains("reddit") { return .reddit }
+    if normalized.contains("linear") { return .linear }
+    if normalized.contains("figma") { return .figma }
+    if normalized.contains("chatgpt") { return .symbol("sparkles", backgroundHex: "1F1F1F", foregroundHex: "FFFFFF") }
+    if normalized.contains("claude") { return .symbol("sun.max.fill", backgroundHex: "D97757", foregroundHex: "FFFFFF") }
+    if normalized.contains("cursor") || normalized.contains("codex") { return .symbol("cursorarrow", backgroundHex: "2B2724", foregroundHex: "FFFFFF") }
+    if normalized.contains("github") { return .symbol("chevron.left.forwardslash.chevron.right", backgroundHex: "24292F", foregroundHex: "FFFFFF") }
+    if normalized.contains("mail") || normalized.contains("gmail") { return .symbol("envelope.fill", backgroundHex: "D95040", foregroundHex: "FFFFFF") }
+    if normalized.contains("calendar") { return .symbol("calendar", backgroundHex: "4779E9", foregroundHex: "FFFFFF") }
+    if normalized.contains("chrome") || normalized.contains("safari") || normalized.contains("web") { return .symbol("globe", backgroundHex: "4779E9", foregroundHex: "FFFFFF") }
+    let letter = name.trimmingCharacters(in: .whitespacesAndNewlines).first.map(String.init) ?? "?"
+    return .monogram(letter.uppercased(), backgroundHex: "6B7280", foregroundHex: "FFFFFF")
+  }
+}
+
 struct WeeklyApplicationNode: Identifiable {
   let id: String
   let name: String

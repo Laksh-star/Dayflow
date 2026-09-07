@@ -109,6 +109,14 @@ struct WeeklyInteractionGraphGlyphView: View {
         WeeklyInteractionBullseyeGlyph()
       case .bars:
         WeeklyInteractionBarsGlyph()
+      case .symbol(let name, let backgroundHex, let foregroundHex):
+        WeeklyInteractionSymbolGlyph(
+          name: name,
+          background: Color(hex: backgroundHex),
+          foreground: Color(hex: foregroundHex),
+          cornerRadius: diameter * 0.18,
+          size: diameter * 0.38
+        )
       case .asset(let name):
         Image(name)
           .resizable()
@@ -124,6 +132,24 @@ struct WeeklyInteractionGraphGlyphView: View {
         )
       }
     }
+  }
+}
+
+struct WeeklyInteractionSymbolGlyph: View {
+  let name: String
+  let background: Color
+  let foreground: Color
+  let cornerRadius: CGFloat
+  let size: CGFloat
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+      .fill(background)
+      .overlay {
+        Image(systemName: name)
+          .font(.system(size: size, weight: .semibold))
+          .foregroundStyle(foreground)
+      }
   }
 }
 

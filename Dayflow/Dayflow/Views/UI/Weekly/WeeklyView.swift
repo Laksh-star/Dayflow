@@ -162,16 +162,19 @@ struct WeeklyView: View {
                 title: "Application interactions",
                 headerTitle: "Interactions between most used applications",
                 downloadButtonOrigin: CGPoint(
-                  x: layout.contentWidth * 29 / WeeklyApplicationInteractionsSection.designWidth,
-                  y: layout.contentWidth * 28 / WeeklyApplicationInteractionsSection.designWidth
+                  x: layout.interactionGraphOriginX + WeeklyInteractionGraphPrototypeSection.Design.titleOrigin.x * layout.interactionGraphScale,
+                  y: WeeklyInteractionGraphPrototypeSection.Design.titleOrigin.y * layout.interactionGraphScale
                 ),
                 fileName: exportFileName("application-interactions"),
-                exportWidth: WeeklyApplicationInteractionsSection.designWidth,
-                displayHeight: layout.applicationInteractionsHeight,
-                exportHeight: WeeklyApplicationInteractionsSection.designHeight,
+                exportWidth: WeeklyInteractionGraphPrototypeSection.Design.sectionSize.width,
+                displayHeight: layout.interactionGraphHeight,
+                exportHeight: WeeklyInteractionGraphPrototypeSection.Design.sectionSize.height,
                 watermarkPlacement: .bottomTrailing
               ) { width in
-                scaledApplicationInteractions(snapshot: dashboardSnapshot.applicationInteractions, width: width)
+                scaledApplicationInteractions(
+                  snapshot: dashboardSnapshot.applicationInteractions.graphSnapshot,
+                  width: width
+                )
               }
 
               WeeklyExportableGraphic(
@@ -265,17 +268,20 @@ struct WeeklyView: View {
   }
 
   private func scaledApplicationInteractions(
-    snapshot: WeeklyApplicationInteractionsSnapshot,
+    snapshot: WeeklyInteractionGraphSnapshot,
     width: CGFloat
   ) -> some View {
-    let scale = width / WeeklyApplicationInteractionsSection.designWidth
-    return WeeklyApplicationInteractionsSection(snapshot: snapshot)
+    let design = WeeklyInteractionGraphPrototypeSection.Design.sectionSize
+    let renderedWidth = min(width, WeeklyAdaptiveLayout.maximumInteractionGraphWidth)
+    let scale = renderedWidth / design.width
+    return WeeklyInteractionGraphPrototypeSection(snapshot: snapshot)
       .scaleEffect(scale, anchor: .topLeading)
       .frame(
-        width: width,
-        height: WeeklyApplicationInteractionsSection.designHeight * scale,
+        width: renderedWidth,
+        height: design.height * scale,
         alignment: .topLeading
       )
+      .frame(width: width, height: design.height * scale, alignment: .center)
   }
 
   private static let weeklyDataRequirementMinutes = 15 * 60
@@ -610,7 +616,7 @@ private struct WeeklyAdaptiveLayout {
   static let suggestionsHeight: CGFloat = 328
   static let treemapHeight: CGFloat = 549
   static let heatmapHeight: CGFloat = 238
-  static let applicationInteractionsDesignHeight: CGFloat = WeeklyApplicationInteractionsSection.designHeight
+  static let maximumInteractionGraphWidth: CGFloat = 958
   static let dataGateHeight: CGFloat = 360
   static let designSankeyHeight: CGFloat = designContentWidth * 933 / 1748
   static let maximumContentWidth: CGFloat = 1500
@@ -642,8 +648,20 @@ private struct WeeklyAdaptiveLayout {
     contentWidth * 933 / 1748
   }
 
-  var applicationInteractionsHeight: CGFloat {
-    contentWidth * Self.applicationInteractionsDesignHeight / Self.designContentWidth
+  var interactionGraphRenderedWidth: CGFloat {
+    min(contentWidth, Self.maximumInteractionGraphWidth)
+  }
+
+  var interactionGraphScale: CGFloat {
+    interactionGraphRenderedWidth / WeeklyInteractionGraphPrototypeSection.Design.sectionSize.width
+  }
+
+  var interactionGraphHeight: CGFloat {
+    WeeklyInteractionGraphPrototypeSection.Design.sectionSize.height * interactionGraphScale
+  }
+
+  var interactionGraphOriginX: CGFloat {
+    max(0, (contentWidth - interactionGraphRenderedWidth) / 2)
   }
 
   var sectionSpacing: CGFloat {
