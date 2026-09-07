@@ -9,6 +9,7 @@ This file tracks local fork work that may or may not be suitable for upstream Da
   - a **Review day** sheet from the day-summary rail for task entry, offline/manual capture, evidence suggestions, and a day-scoped question surface;
   - voice transcription reused in the review composer, with transcript preview before asking and optional local speech output;
   - Markdown exports now append structured Tasks, Manual captures, and Review decisions sections when data exists.
+  - Documented the distinction between task intention, manual-capture evidence, OpenAI transcription, and local speech output.
 
 - Added the first Dayflow Personal Assistant prototype block:
   - Dev-only `Voice review prototype` panel in Settings -> Other.
