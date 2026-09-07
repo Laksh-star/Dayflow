@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct WeeklyInteractionGraphNodeBadge: View {
@@ -41,12 +42,81 @@ struct WeeklyInteractionGraphNodeBadge: View {
           y: 0
         )
 
+      WeeklyInteractionGraphResolvedIconView(node: node)
+      .padding(node.diameter * 0.2)
+    }
+    .accessibilityLabel(node.node.title)
+    .help(node.node.title)
+  }
+}
+
+private struct WeeklyInteractionGraphResolvedIconView: View {
+  let node: WeeklyInteractionGraphNodeLayout
+
+  @State private var installedIcon: NSImage?
+
+  init(node: WeeklyInteractionGraphNodeLayout) {
+    self.node = node
+    self._installedIcon = State(
+      initialValue: WeeklyInstalledApplicationIcon.image(for: node.node.title)
+    )
+  }
+
+  var body: some View {
+    ZStack {
       WeeklyInteractionGraphGlyphView(
         glyph: node.glyph,
         diameter: node.diameter
       )
-      .padding(node.diameter * 0.2)
+
+      if let installedIcon {
+        Image(nsImage: installedIcon)
+          .resizable()
+          .interpolation(.high)
+          .aspectRatio(contentMode: .fit)
+      } else {
+        FaviconImageView(
+          primaryRaw: node.node.faviconPrimaryRaw,
+          secondaryRaw: node.node.faviconSecondaryRaw,
+          primaryHost: node.node.faviconPrimaryHost,
+          secondaryHost: node.node.faviconSecondaryHost,
+          fallbackRaw: node.node.title,
+          size: node.diameter * 0.58,
+          cornerRadius: node.diameter * 0.14
+        )
+      }
     }
+  }
+}
+
+private enum WeeklyInstalledApplicationIcon {
+  private static let bundleIdentifiers: [(needle: String, identifier: String)] = [
+    ("chatgpt", "com.openai.chat"),
+    ("codex", "com.openai.codex"),
+    ("claude", "com.anthropic.claudefordesktop"),
+    ("slack", "com.tinyspeck.slackmacgap"),
+    ("mail", "com.apple.mail"),
+    ("safari", "com.apple.Safari"),
+    ("chrome", "com.google.Chrome"),
+    ("xcode", "com.apple.dt.Xcode"),
+    ("finder", "com.apple.finder"),
+    ("calendar", "com.apple.iCal"),
+    ("messages", "com.apple.MobileSMS"),
+    ("zoom", "us.zoom.xos"),
+    ("notion", "notion.id"),
+    ("figma", "com.figma.Desktop"),
+    ("obsidian", "md.obsidian")
+  ]
+
+  static func image(for title: String) -> NSImage? {
+    let normalized = title.lowercased()
+    guard let match = bundleIdentifiers.first(where: { normalized.contains($0.needle) }) else {
+      return nil
+    }
+    guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: match.identifier) else {
+      return nil
+    }
+    return NSWorkspace.shared.icon(forFile: url.path)
   }
 }
 

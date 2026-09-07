@@ -127,6 +127,7 @@ extension WeeklyDashboardBuilder {
   private static func appAggregates(from facts: [WeeklyCardFact]) -> [WeeklyAppAggregate] {
     Dictionary(grouping: facts, by: \.appKey).values.map { appFacts in
       let first = appFacts[0]
+      let faviconSource = appFacts.first(where: \.hasFaviconLookupSource) ?? first
       let minutes = appFacts.reduce(0) { $0 + $1.durationMinutes }
       let visits = appFacts.count
       let kind = resolvedAppKind(from: appFacts)
@@ -136,7 +137,11 @@ extension WeeklyDashboardBuilder {
         colorHex: first.appColorHex,
         kind: kind,
         minutes: minutes,
-        visits: visits
+        visits: visits,
+        faviconPrimaryRaw: faviconSource.faviconPrimaryRaw,
+        faviconSecondaryRaw: faviconSource.faviconSecondaryRaw,
+        faviconPrimaryHost: faviconSource.faviconPrimaryHost,
+        faviconSecondaryHost: faviconSource.faviconSecondaryHost
       )
     }
     .sorted {
@@ -181,7 +186,11 @@ extension WeeklyDashboardBuilder {
         kind: app.kind,
         mark: appInitial(app.name),
         isPrimary: index == 0,
-        isMuted: index > 5
+        isMuted: index > 5,
+        faviconPrimaryRaw: app.faviconPrimaryRaw,
+        faviconSecondaryRaw: app.faviconSecondaryRaw,
+        faviconPrimaryHost: app.faviconPrimaryHost,
+        faviconSecondaryHost: app.faviconSecondaryHost
       )
     }
   }
@@ -281,7 +290,11 @@ extension WeeklyDashboardBuilder {
         colorHex: "D9D9D9",
         kind: .work,
         minutes: 0,
-        visits: 1
+        visits: 1,
+        faviconPrimaryRaw: nil,
+        faviconSecondaryRaw: nil,
+        faviconPrimaryHost: nil,
+        faviconSecondaryHost: nil
       )
     let targets = visibleApps.filter { $0.kind == .distraction }.prefixArray(4)
     return WeeklyRabbitHoleSnapshot(
@@ -402,6 +415,10 @@ private struct WeeklyAppAggregate {
   let kind: WeeklyApplicationKind
   let minutes: Int
   let visits: Int
+  let faviconPrimaryRaw: String?
+  let faviconSecondaryRaw: String?
+  let faviconPrimaryHost: String?
+  let faviconSecondaryHost: String?
 }
 
 private struct WeeklyAppTransition {

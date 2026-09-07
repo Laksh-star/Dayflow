@@ -91,19 +91,31 @@ struct WeeklyInteractionGraphNode: Identifiable {
   let category: WeeklyInteractionGraphCategory
   let glyph: WeeklyInteractionGraphGlyph
   let importanceBoost: CGFloat
+  let faviconPrimaryRaw: String?
+  let faviconSecondaryRaw: String?
+  let faviconPrimaryHost: String?
+  let faviconSecondaryHost: String?
 
   init(
     id: String,
     title: String,
     category: WeeklyInteractionGraphCategory,
     glyph: WeeklyInteractionGraphGlyph,
-    importanceBoost: CGFloat = 0
+    importanceBoost: CGFloat = 0,
+    faviconPrimaryRaw: String? = nil,
+    faviconSecondaryRaw: String? = nil,
+    faviconPrimaryHost: String? = nil,
+    faviconSecondaryHost: String? = nil
   ) {
     self.id = id
     self.title = title
     self.category = category
     self.glyph = glyph
     self.importanceBoost = importanceBoost
+    self.faviconPrimaryRaw = faviconPrimaryRaw
+    self.faviconSecondaryRaw = faviconSecondaryRaw
+    self.faviconPrimaryHost = faviconPrimaryHost
+    self.faviconSecondaryHost = faviconSecondaryHost
   }
 }
 

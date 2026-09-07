@@ -416,7 +416,11 @@ extension WeeklyApplicationInteractionsSnapshot {
         title: node.name,
         category: node.kind.graphCategory,
         glyph: WeeklyInteractionGraphGlyph.liveAppGlyph(for: node.name),
-        importanceBoost: node.isPrimary ? 0.5 : (node.isMuted ? -0.05 : 0)
+        importanceBoost: node.isPrimary ? 0.5 : (node.isMuted ? -0.05 : 0),
+        faviconPrimaryRaw: node.faviconPrimaryRaw,
+        faviconSecondaryRaw: node.faviconSecondaryRaw,
+        faviconPrimaryHost: node.faviconPrimaryHost,
+        faviconSecondaryHost: node.faviconSecondaryHost
       )
     }
     let graphEdges = edges.map { edge in
@@ -489,6 +493,10 @@ struct WeeklyApplicationNode: Identifiable {
   let mark: String
   let isPrimary: Bool
   let isMuted: Bool
+  let faviconPrimaryRaw: String?
+  let faviconSecondaryRaw: String?
+  let faviconPrimaryHost: String?
+  let faviconSecondaryHost: String?
 
   init(
     id: String,
@@ -499,7 +507,11 @@ struct WeeklyApplicationNode: Identifiable {
     kind: WeeklyApplicationKind,
     mark: String,
     isPrimary: Bool = false,
-    isMuted: Bool = false
+    isMuted: Bool = false,
+    faviconPrimaryRaw: String? = nil,
+    faviconSecondaryRaw: String? = nil,
+    faviconPrimaryHost: String? = nil,
+    faviconSecondaryHost: String? = nil
   ) {
     self.id = id
     self.name = name
@@ -510,6 +522,10 @@ struct WeeklyApplicationNode: Identifiable {
     self.mark = mark
     self.isPrimary = isPrimary
     self.isMuted = isMuted
+    self.faviconPrimaryRaw = faviconPrimaryRaw
+    self.faviconSecondaryRaw = faviconSecondaryRaw
+    self.faviconPrimaryHost = faviconPrimaryHost
+    self.faviconSecondaryHost = faviconSecondaryHost
   }
 
   var point: CGPoint { CGPoint(x: x, y: y) }
