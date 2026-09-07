@@ -48,6 +48,14 @@ private struct CanvasPositionedActivity: Identifiable {
   let batchIds: [Int64]
 }
 
+private struct CanvasManualCapture: Identifiable {
+  let id: UUID
+  let title: String
+  let yPosition: CGFloat
+  let height: CGFloat
+  let timeLabel: String
+}
+
 struct CanvasTimelineDataView: View {
   @Binding var selectedDate: Date
   @Binding var selectedActivity: TimelineActivity?
@@ -73,6 +81,7 @@ struct CanvasTimelineDataView: View {
 
   @State private var selectedCardId: String? = nil
   @State private var positionedActivities: [CanvasPositionedActivity] = []
+  @State private var positionedManualCaptures: [CanvasManualCapture] = []
   @State private var plannedFocusWindows: [DayFocusWindow] = []
   @State private var recordingProjection: TimelineRecordingProjectionWindow?
   @State private var cardsLayerFrame: CGRect = .zero
@@ -191,6 +200,9 @@ struct CanvasTimelineDataView: View {
           scrollToNowCenteredHour(with: proxy)
           revealInitialScroll()
         }
+      }
+      .onReceive(NotificationCenter.default.publisher(for: .personalAssistantTimelineDidChange)) { _ in
+        loadActivities()
       }
       .onAppear {
         if timelineIsToday(selectedDate) {
@@ -334,6 +346,29 @@ struct CanvasTimelineDataView: View {
           .pointingHandCursor(enabled: selectedCardId != nil || selectedActivity != nil)
 
         plannedFocusWindowsOverlay(in: geo)
+
+        ForEach(positionedManualCaptures) { capture in
+          HStack(spacing: 6) {
+            Image(systemName: "pencil.line")
+            Text("Manual: \(capture.title)")
+              .lineLimit(1)
+            Spacer(minLength: 4)
+            Text(capture.timeLabel)
+          }
+          .font(.custom("Figtree", size: 11).weight(.medium))
+          .foregroundColor(Color(hex: "745C48"))
+          .padding(.horizontal, 9)
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+          .background(Color(hex: "F7E2C6").opacity(0.78))
+          .overlay(
+            RoundedRectangle(cornerRadius: 4)
+              .stroke(Color(hex: "C98F54").opacity(0.75), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+          )
+          .clipShape(RoundedRectangle(cornerRadius: 4))
+          .allowsHitTesting(false)
+          .frame(width: geo.size.width, height: capture.height)
+          .position(x: geo.size.width / 2, y: capture.yPosition + (capture.height / 2))
+        }
 
         ForEach(Array(positionedActivities.enumerated()), id: \.element.id) { index, item in
           let isVisible = cardEntranceProgress[item.id] ?? false
@@ -660,6 +695,7 @@ struct CanvasTimelineDataView: View {
         categories: currentCategories
       )
       let plannedFocusWindows = focusPlan.focusWindows.filter(\.isValid)
+      let manualCaptures = StorageManager.shared.fetchManualCaptures(forDay: dayString)
 
       // Check for cancellation before expensive processing
       guard !Task.isCancelled else { return }
@@ -704,6 +740,20 @@ struct CanvasTimelineDataView: View {
         )
       }
 
+      let positionedCaptures = manualCaptures.compactMap { capture -> CanvasManualCapture? in
+        guard let startTs = capture.startTs, let endTs = capture.endTs, endTs > startTs else { return nil }
+        let start = Date(timeIntervalSince1970: TimeInterval(startTs))
+        let end = Date(timeIntervalSince1970: TimeInterval(endTs))
+        let duration = max(1, end.timeIntervalSince(start) / 60)
+        return CanvasManualCapture(
+          id: capture.id,
+          title: capture.body,
+          yPosition: self.calculateYPosition(for: start) + 1,
+          height: max(18, CGFloat(duration) * pixelsPerMinute - 2),
+          timeLabel: self.formatRange(start: start, end: end)
+        )
+      }
+
       // Final cancellation check before updating UI
       guard !Task.isCancelled else { return }
 
@@ -725,6 +775,7 @@ struct CanvasTimelineDataView: View {
           self.cardEntranceProgress = [:]
         }
         self.positionedActivities = positioned
+        self.positionedManualCaptures = positionedCaptures
         self.plannedFocusWindows = plannedFocusWindows
         self.recordingProjection = recordingProjection
         self.hasAnyActivities = !positioned.isEmpty

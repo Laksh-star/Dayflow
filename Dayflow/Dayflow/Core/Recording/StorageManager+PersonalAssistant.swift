@@ -126,6 +126,62 @@ extension StorageManager {
     }) ?? []
   }
 
+  func fetchTaskEvidenceLinks(forTask taskID: UUID) -> [TaskEvidenceLink] {
+    (try? timedRead("fetchTaskEvidenceLinks") { db in
+      try Row.fetchAll(
+        db,
+        sql: "SELECT id, task_id, day, source, source_id, strength, matched_by, created_at FROM task_evidence_links WHERE task_id = ? ORDER BY created_at DESC",
+        arguments: [taskID.uuidString]
+      ).compactMap { row in
+        guard let id = UUID(uuidString: row["id"]),
+          let source = TaskEvidenceSource(rawValue: row["source"]),
+          let strength = TaskEvidenceStrength(rawValue: row["strength"])
+        else { return nil }
+        return TaskEvidenceLink(
+          id: id, taskID: taskID, day: row["day"], source: source, sourceID: row["source_id"],
+          strength: strength, matchedBy: row["matched_by"], createdAt: row["created_at"]
+        )
+      }
+    }) ?? []
+  }
+
+  func saveTaskEvidenceLink(_ link: TaskEvidenceLink) {
+    try? timedWrite("saveTaskEvidenceLink") { db in
+      try db.execute(
+        sql: """
+          INSERT INTO task_evidence_links(id, task_id, day, source, source_id, strength, matched_by, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(task_id, source, source_id) DO UPDATE SET strength = excluded.strength, matched_by = excluded.matched_by
+        """,
+        arguments: [
+          link.id.uuidString, link.taskID.uuidString, link.day, link.source.rawValue, link.sourceID,
+          link.strength.rawValue, link.matchedBy, link.createdAt,
+        ]
+      )
+    }
+  }
+
+  func deleteTaskEvidenceLink(id: UUID) {
+    try? timedWrite("deleteTaskEvidenceLink") { db in
+      try db.execute(sql: "DELETE FROM task_evidence_links WHERE id = ?", arguments: [id.uuidString])
+    }
+  }
+
+  func hasImportedMobileCapture(sourcePath: String) -> Bool {
+    (try? timedRead("hasImportedMobileCapture") { db in
+      try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM mobile_capture_imports WHERE source_path = ?)", arguments: [sourcePath])
+    }) ?? false
+  }
+
+  func recordMobileCaptureImport(sourcePath: String, importedAt: Int) {
+    try? timedWrite("recordMobileCaptureImport") { db in
+      try db.execute(
+        sql: "INSERT OR IGNORE INTO mobile_capture_imports(source_path, imported_at) VALUES (?, ?)",
+        arguments: [sourcePath, importedAt]
+      )
+    }
+  }
+
   private static func taskFromRow(_ row: Row) -> DayflowTask? {
     guard let id = UUID(uuidString: row["id"]), let status = DayflowTaskStatus(rawValue: row["status"]) else { return nil }
     return DayflowTask(

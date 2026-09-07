@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct DayReviewAssistantView: View {
@@ -16,9 +17,13 @@ struct DayReviewAssistantView: View {
   @State private var includeCaptureTime = false
   @State private var captureStart = Date()
   @State private var captureEnd = Date().addingTimeInterval(30 * 60)
+  @State private var captureTaskID: UUID?
   @State private var question = ""
   @State private var answer = ""
   @State private var isShowingCaptureForm = false
+  @State private var isAnswering = false
+  @State private var answerSource = ""
+  @State private var inboxStatus = ""
 
   var body: some View {
     VStack(spacing: 0) {
@@ -102,8 +107,16 @@ struct DayReviewAssistantView: View {
 
   private var captureSection: some View {
     reviewSectionCard(title: "Manual captures", subtitle: "Record activity Dayflow could not see, without inventing tracked time.") {
-      Button(isShowingCaptureForm ? "Hide capture" : "Add capture") { isShowingCaptureForm.toggle() }
-        .buttonStyle(.bordered)
+      HStack {
+        Button(isShowingCaptureForm ? "Hide capture" : "Add capture") { isShowingCaptureForm.toggle() }
+          .buttonStyle(.bordered)
+        Spacer()
+        Button("Choose mobile inbox", action: chooseMobileInbox)
+          .buttonStyle(.bordered)
+        Button("Import mobile inbox", action: importMobileInbox)
+          .buttonStyle(.bordered)
+      }
+      if !inboxStatus.isEmpty { emptyText(inboxStatus) }
       if isShowingCaptureForm {
         VStack(alignment: .leading, spacing: 10) {
           TextField("What happened?", text: $captureBody)
@@ -112,6 +125,12 @@ struct DayReviewAssistantView: View {
             ForEach(ManualCaptureKind.allCases, id: \.self) { Text($0.label).tag($0) }
           }
           .pickerStyle(.segmented)
+          Picker("Task", selection: $captureTaskID) {
+            Text("No linked task").tag(UUID?.none)
+            ForEach(tasks.filter { $0.status != .dropped }) { task in
+              Text(task.title).tag(Optional(task.id))
+            }
+          }
           Toggle("Add a time range", isOn: $includeCaptureTime)
           if includeCaptureTime {
             HStack {
@@ -161,11 +180,13 @@ struct DayReviewAssistantView: View {
       }
       ForEach(suggestions) { suggestion in
         switch suggestion.kind {
-        case .likelyWork(let task, let minutes):
+        case .likelyWork(let task, let minutes, let cardIDs):
           HStack {
             Text("Likely work found: \(minutes)m related to \(task.title)")
               .font(.custom("Figtree", size: 13))
             Spacer()
+            Button("Link evidence") { linkEvidence(task: task, cardIDs: cardIDs) }
+              .buttonStyle(.bordered)
             Button("Mark done") { updateTask(task, status: .done, decision: .complete) }
               .buttonStyle(.bordered)
           }
@@ -186,7 +207,7 @@ struct DayReviewAssistantView: View {
   }
 
   private var conversationSection: some View {
-    reviewSectionCard(title: "Ask about this day", subtitle: "Answers are based only on this day’s local tasks, captures, and timeline cards.") {
+    reviewSectionCard(title: "Ask about this day", subtitle: "Uses this day's evidence. OpenAI is used only when you press Ask and it is configured directly.") {
       if !voiceService.transcript.isEmpty {
         Text(voiceService.transcript)
           .font(.custom("Figtree", size: 13))
@@ -209,12 +230,14 @@ struct DayReviewAssistantView: View {
         ReviewVoiceButton(service: voiceService)
         Button("Ask", action: answerQuestion)
           .buttonStyle(.borderedProminent)
-          .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAnswering)
       }
+      if isAnswering { emptyText("Reviewing this day's evidence...") }
       if !answer.isEmpty {
         VStack(alignment: .leading, spacing: 8) {
           Text(answer)
             .font(.custom("Figtree", size: 14))
+          if !answerSource.isEmpty { emptyText(answerSource) }
           Button("Speak answer") { voiceService.speak(text: answer) }
             .buttonStyle(.bordered)
         }
@@ -264,10 +287,15 @@ struct DayReviewAssistantView: View {
     let body = captureBody.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !body.isEmpty else { return }
     let now = Int(Date().timeIntervalSince1970)
-    let capture = ManualCapture(id: UUID(), day: day, body: body, kind: captureKind, startTs: includeCaptureTime ? Int(captureStart.timeIntervalSince1970) : nil, endTs: includeCaptureTime ? Int(captureEnd.timeIntervalSince1970) : nil, categoryID: nil, projectName: nil, taskID: nil, source: .desktop, sourcePayload: nil, createdAt: now, updatedAt: now)
+    let capture = ManualCapture(id: UUID(), day: day, body: body, kind: captureKind, startTs: includeCaptureTime ? Int(captureStart.timeIntervalSince1970) : nil, endTs: includeCaptureTime ? Int(captureEnd.timeIntervalSince1970) : nil, categoryID: nil, projectName: nil, taskID: captureTaskID, source: .desktop, sourcePayload: nil, createdAt: now, updatedAt: now)
     storageManager.saveManualCapture(capture)
+    if let taskID = captureTaskID {
+      storageManager.saveTaskEvidenceLink(TaskEvidenceLink(id: UUID(), taskID: taskID, day: day, source: .manualCapture, sourceID: capture.id.uuidString, strength: .manual, matchedBy: "user", createdAt: now))
+    }
     captureBody = ""
+    captureTaskID = nil
     isShowingCaptureForm = false
+    NotificationCenter.default.post(name: .personalAssistantTimelineDidChange, object: nil)
     reload()
   }
 
@@ -282,11 +310,15 @@ struct DayReviewAssistantView: View {
     reload()
   }
   private func deleteTask(_ task: DayflowTask) { storageManager.deleteTask(id: task.id); reload() }
-  private func deleteCapture(_ capture: ManualCapture) { storageManager.deleteManualCapture(id: capture.id); reload() }
+  private func deleteCapture(_ capture: ManualCapture) {
+    storageManager.deleteManualCapture(id: capture.id)
+    NotificationCenter.default.post(name: .personalAssistantTimelineDidChange, object: nil)
+    reload()
+  }
   private func carryForward(_ task: DayflowTask) {
     var updated = task
     updated.status = .deferred
-    updated.plannedDay = Calendar.current.date(byAdding: .day, value: 1, to: Date())?.formatted(.iso8601.year().month().day())
+    updated.plannedDay = nextDayString(after: day)
     updated.updatedAt = Int(Date().timeIntervalSince1970)
     storageManager.saveTask(updated)
     storageManager.saveDayReviewDecision(DayReviewDecision(id: UUID(), day: day, taskID: task.id, kind: .carryForward, payloadJSON: "{}", createdAt: updated.updatedAt))
@@ -301,22 +333,85 @@ struct DayReviewAssistantView: View {
         let text = "\(card.title) \(card.summary)".lowercased()
         return words.contains { text.contains($0) }
       }
-      if !matches.isEmpty { return DayReviewSuggestion(id: "work-\(task.id)", kind: .likelyWork(task: task, minutes: matches.count * 15)) }
+      let matchedIDs = matches.compactMap(\.recordId)
+      let minutes = matches.reduce(0) { partial, card in
+        let duration = TimelineActivityLoader.buildActivities(from: [card]).first.map {
+          Int(($0.endTime.timeIntervalSince($0.startTime) / 60).rounded())
+        } ?? 0
+        return partial + duration
+      }
+      if !matches.isEmpty { return DayReviewSuggestion(id: "work-\(task.id)", kind: .likelyWork(task: task, minutes: minutes, cardIDs: matchedIDs)) }
       return DayReviewSuggestion(id: "carry-\(task.id)", kind: .carryForward(task: task))
     }
   }
 
+  private func linkEvidence(task: DayflowTask, cardIDs: [Int64]) {
+    let now = Int(Date().timeIntervalSince1970)
+    for cardID in cardIDs {
+      storageManager.saveTaskEvidenceLink(TaskEvidenceLink(id: UUID(), taskID: task.id, day: day, source: .timelineCard, sourceID: String(cardID), strength: .likely, matchedBy: "deterministic", createdAt: now))
+    }
+    storageManager.saveDayReviewDecision(DayReviewDecision(id: UUID(), day: day, taskID: task.id, kind: .linkEvidence, payloadJSON: "{}", createdAt: now))
+    reload()
+  }
+
   private func answerQuestion() {
-    let normalized = question.lowercased()
+    let requestedQuestion = question.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !requestedQuestion.isEmpty, !isAnswering else { return }
+    isAnswering = true
+    answer = ""
+    Task {
+      do {
+        let providerAnswer = try await DayReviewAnswerService().answer(question: requestedQuestion, day: day, cards: cards, tasks: tasks, captures: captures)
+        await MainActor.run {
+          answer = providerAnswer
+          answerSource = "Provider-backed answer from this day's supplied evidence."
+          isAnswering = false
+        }
+      } catch {
+        await MainActor.run {
+          answer = localAnswer(for: requestedQuestion)
+          answerSource = "Local evidence fallback: \(error.localizedDescription)"
+          isAnswering = false
+        }
+      }
+    }
+  }
+
+  private func localAnswer(for prompt: String) -> String {
+    let normalized = prompt.lowercased()
     if normalized.contains("unfinished") || normalized.contains("task") {
       let open = tasks.filter { $0.status != .done && $0.status != .dropped }.map(\.title)
-      answer = open.isEmpty ? "There are no unfinished tasks for this day." : "Still open: \(open.joined(separator: ", "))."
+      return open.isEmpty ? "There are no unfinished tasks for this day." : "Still open: \(open.joined(separator: ", "))."
     } else if normalized.contains("capture") || normalized.contains("offline") {
-      answer = captures.isEmpty ? "There are no manual captures for this day." : "Manual captures: \(captures.map(\.body).joined(separator: "; "))."
+      return captures.isEmpty ? "There are no manual captures for this day." : "Manual captures: \(captures.map(\.body).joined(separator: "; "))."
     } else {
       let titles = cards.prefix(4).map(\.title)
-      answer = titles.isEmpty ? "There are no processed desktop cards for this day yet." : "Dayflow recorded \(cards.count) desktop activity cards. The main threads were: \(titles.joined(separator: "; "))."
+      return titles.isEmpty ? "There are no processed desktop cards for this day yet." : "Dayflow recorded \(cards.count) desktop activity cards. The main threads were: \(titles.joined(separator: "; "))."
     }
+  }
+
+  private func nextDayString(after string: String) -> String? {
+    guard let date = DateFormatter.yyyyMMdd.date(from: string),
+      let next = Calendar.current.date(byAdding: .day, value: 1, to: date)
+    else { return nil }
+    return DateFormatter.yyyyMMdd.string(from: next)
+  }
+
+  private func chooseMobileInbox() {
+    let panel = NSOpenPanel()
+    panel.canChooseFiles = false
+    panel.canChooseDirectories = true
+    panel.allowsMultipleSelection = false
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    UserDefaults.standard.set(url.path, forKey: MobileCaptureInboxService.folderPathDefaultsKey)
+    inboxStatus = "Mobile inbox: \(url.lastPathComponent)"
+  }
+
+  private func importMobileInbox() {
+    let result = MobileCaptureInboxService().importCaptures(storageManager: storageManager)
+    inboxStatus = result.summary
+    if result.imported > 0 { NotificationCenter.default.post(name: .personalAssistantTimelineDidChange, object: nil) }
+    reload()
   }
 }
 

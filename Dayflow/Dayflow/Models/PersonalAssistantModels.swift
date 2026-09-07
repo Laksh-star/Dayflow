@@ -1,5 +1,9 @@
 import Foundation
 
+extension Notification.Name {
+  static let personalAssistantTimelineDidChange = Notification.Name("personalAssistantTimelineDidChange")
+}
+
 enum DayflowTaskStatus: String, CaseIterable, Codable, Sendable {
   case inbox
   case planned
@@ -98,9 +102,44 @@ struct DayReviewDecision: Identifiable, Equatable, Sendable {
   let createdAt: Int
 }
 
+enum TaskEvidenceSource: String, Codable, Sendable {
+  case timelineCard = "timeline_card"
+  case manualCapture = "manual_capture"
+}
+
+enum TaskEvidenceStrength: String, Codable, Sendable {
+  case direct
+  case likely
+  case manual
+}
+
+struct TaskEvidenceLink: Identifiable, Equatable, Sendable {
+  let id: UUID
+  let taskID: UUID
+  let day: String
+  let source: TaskEvidenceSource
+  let sourceID: String
+  let strength: TaskEvidenceStrength
+  let matchedBy: String
+  let createdAt: Int
+}
+
+struct MobileCaptureInboxResult: Equatable, Sendable {
+  let imported: Int
+  let skipped: Int
+  let errors: [String]
+
+  var summary: String {
+    var parts = ["Imported \(imported) mobile capture\(imported == 1 ? "" : "s")"]
+    if skipped > 0 { parts.append("\(skipped) already imported") }
+    if !errors.isEmpty { parts.append("\(errors.count) file error\(errors.count == 1 ? "" : "s")") }
+    return parts.joined(separator: ". ") + "."
+  }
+}
+
 struct DayReviewSuggestion: Identifiable, Equatable, Sendable {
   enum Kind: Equatable, Sendable {
-    case likelyWork(task: DayflowTask, minutes: Int)
+    case likelyWork(task: DayflowTask, minutes: Int, cardIDs: [Int64])
     case carryForward(task: DayflowTask)
     case unlinkedCapture(capture: ManualCapture)
   }

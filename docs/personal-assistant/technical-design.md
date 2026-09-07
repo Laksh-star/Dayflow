@@ -1,6 +1,6 @@
 # Dayflow Personal Assistant - Technical Design
 
-**Status:** Initial local storage and review workspace implemented; follow-up work will deepen mobile import and provider-backed answers.
+**Status:** The first end-to-end review path is implemented. Provider answers remain constrained to a supplied day context and mobile imports are folder-based rather than a network service.
 **Companion:** [Product Requirements](requirements.md)
 
 ## 1. Architecture Position
@@ -54,7 +54,7 @@ Indexes: `planned_day`, `status`, and `updated_at`.
 | `start_ts`, `end_ts` | Nullable; both required for a timed interval. |
 | `category_id`, `project_name` | Nullable. |
 | `source` | desktop, mobile_shortcut, review, conversation. |
-| `source_payload` | Nullable raw structured import payload for audit/debug. |
+| `source_payload` | Nullable source metadata; raw mobile payloads are not retained by the first importer. |
 | `created_at`, `updated_at` | Unix timestamps. |
 
 Constraint: `end_ts > start_ts` whenever both values are present. A timed capture stays separate from automated cards to preserve provenance.
@@ -154,7 +154,7 @@ This service is an adapter around the text conversation service:
 4. submitted text goes through `ReviewConversationService`;
 5. response may be spoken with local `AVSpeechSynthesizer`.
 
-The voice layer is not allowed to write data directly.
+The voice layer is not allowed to write data directly. A provider-backed answer is requested only when the user presses **Ask** and receives only the selected day's task, capture, and desktop-card context. When direct OpenAI configuration is unavailable or fails, the UI provides a deterministic local summary.
 
 ## 4. Voice Capability Approach
 
@@ -185,7 +185,7 @@ Permission requests occur only after the user invokes voice. The first release h
 ### Daily view
 
 - Add a compact `Tasks` section near existing goals/focus surfaces.
-- Add manual captures as differentiated timeline intervals and/or a capture row in day review.
+- Timed manual captures render as differentiated dashed timeline intervals; untimed captures remain in day review only.
 - Add `Review day` entry point after sufficient activity exists.
 
 ### Review surface
@@ -238,7 +238,7 @@ Later, a reviewed task may provide default project/category metadata for a linke
 - New tables must tolerate empty state and be safe to delete individually only through an explicit settings action.
 - Keep all new views hidden/empty when no feature data exists.
 - A provider failure leaves review data untouched and offers retry or text-only local summary where possible.
-- A failed mobile import remains in the inbox with its original payload and a visible reason.
+- A failed mobile import remains in the selected folder with a visible reason. Successful imports leave source files in place and are deduplicated by source path.
 
 ## 9. Tests
 
@@ -270,7 +270,7 @@ Exact files should be confirmed against the current upstream-rebased checkout be
 - `Dayflow/Dayflow/Views/UI/MainView/` and daily-view components for tasks, capture, and review entry points.
 - Existing chat/provider services for `ReviewConversationService` integration.
 - Existing Markdown export services for structured task/capture sections.
-- Existing iPhone/mobile-inbox import code for structured Shortcut payloads.
+- `MobileCaptureInboxService.swift` for the folder-based structured Shortcut payload importer.
 
 ## 11. Delivery Order
 

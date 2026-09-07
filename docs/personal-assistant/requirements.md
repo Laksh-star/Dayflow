@@ -1,6 +1,6 @@
 # Dayflow Personal Assistant - Product Requirements
 
-**Status:** Implemented initial integrated workspace; follow-up work will deepen mobile import and provider-backed answers.
+**Status:** Implemented through the first end-to-end review loop: durable task evidence links, timed manual timeline intervals, direct-OpenAI answers with local fallback, and a structured folder-based mobile inbox.
 **Audience:** Dayflow Dev fork  
 **Principle:** Dayflow is a private work-memory and reflection product. It is not a generic task manager or an always-listening assistant.
 
@@ -76,7 +76,7 @@ Examples:
 - `Read the research paper, 25 min`
 - `Send proposal to client`
 
-The existing iPhone Shortcut/mobile inbox should evolve to create these structured captures, while retaining raw-note fallback.
+The first mobile route is a user-selected shared folder, suitable for iCloud Drive and an iPhone Shortcut. Import reads structured JSON without moving or deleting source files, retains an import receipt for deduplication, and leaves malformed files in place with a visible error.
 
 ### 4.3 End of day
 
@@ -208,9 +208,9 @@ Each block is intended to be independently shippable in one focused implementati
 
 ### Block 5 - Mobile structured capture
 
-**Goal:** Extend the existing Shortcut/mobile inbox to submit structured captures.
+**Goal:** Accept structured mobile captures without giving the importer authority to alter source files or task status.
 
-**Delivers:** A documented Shortcut payload for note, optional time range, type, category/project, and task title; plus an inbox triage surface in Dayflow.
+**Delivers:** A documented JSON payload for note, optional time range, type, category/project, and task id; plus folder selection and an idempotent inbox import action in Dayflow.
 
 **Done when:** A phone-created capture can be reviewed, linked to a task, and shown in the relevant day without requiring cloud sync.
 

@@ -68,6 +68,11 @@ protocol StorageManaging: Sendable {
   func deleteManualCapture(id: UUID)
   func saveDayReviewDecision(_ decision: DayReviewDecision)
   func fetchDayReviewDecisions(forDay day: String) -> [DayReviewDecision]
+  func fetchTaskEvidenceLinks(forTask taskID: UUID) -> [TaskEvidenceLink]
+  func saveTaskEvidenceLink(_ link: TaskEvidenceLink)
+  func deleteTaskEvidenceLink(id: UUID)
+  func hasImportedMobileCapture(sourcePath: String) -> Bool
+  func recordMobileCaptureImport(sourcePath: String, importedAt: Int)
 
   func fetchRecentLLMCallsForDebug(limit: Int) -> [LLMCallDebugEntry]
   func fetchRecentAnalysisBatchesForDebug(limit: Int) -> [AnalysisBatchDebugEntry]

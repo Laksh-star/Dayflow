@@ -4,6 +4,12 @@ This file tracks local fork work that may or may not be suitable for upstream Da
 
 ## 2026-09-06
 
+- Completed the next Personal Assistant review loop:
+  - timed manual captures now render as explicitly manual dashed intervals on the Day timeline;
+  - tasks can retain explicit capture links and user-confirmed likely desktop-card evidence without being marked complete;
+  - **Ask about this day** now uses the configured direct OpenAI provider only after an explicit Ask action, with a local evidence-only fallback on configuration or request failure;
+  - added a user-selected folder importer for structured mobile JSON captures, with source files preserved and duplicate imports blocked by an import receipt.
+
 - Added the first integrated Personal Assistant workspace:
   - local tasks, manual captures, and review decisions stored separately from automated timeline cards;
   - a **Review day** sheet from the day-summary rail for task entry, offline/manual capture, evidence suggestions, and a day-scoped question surface;

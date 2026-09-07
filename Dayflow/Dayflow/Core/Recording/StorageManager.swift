@@ -693,6 +693,25 @@ final class StorageManager: StorageManaging, @unchecked Sendable {
               );
               CREATE INDEX IF NOT EXISTS idx_day_review_decisions_day
               ON day_review_decisions(day, created_at);
+
+              CREATE TABLE IF NOT EXISTS task_evidence_links (
+                  id TEXT PRIMARY KEY,
+                  task_id TEXT NOT NULL,
+                  day TEXT NOT NULL,
+                  source TEXT NOT NULL CHECK(source IN ('timeline_card','manual_capture')),
+                  source_id TEXT NOT NULL,
+                  strength TEXT NOT NULL CHECK(strength IN ('direct','likely','manual')),
+                  matched_by TEXT NOT NULL,
+                  created_at INTEGER NOT NULL,
+                  UNIQUE(task_id, source, source_id)
+              );
+              CREATE INDEX IF NOT EXISTS idx_task_evidence_links_task
+              ON task_evidence_links(task_id, created_at DESC);
+
+              CREATE TABLE IF NOT EXISTS mobile_capture_imports (
+                  source_path TEXT PRIMARY KEY,
+                  imported_at INTEGER NOT NULL
+              );
           """)
 
       // LLM calls logging table
