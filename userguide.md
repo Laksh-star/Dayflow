@@ -16,6 +16,15 @@ The developer Voice review prototype under Settings -> Other remains available t
 
 This guide covers the fork-specific workflow in `Dayflow Dev`.
 
+## Weekly application interactions
+
+The Weekly dashboard now includes **Interactions between most used applications** after the Focus breakdown. It groups the week's non-system, non-idle timeline cards by their recorded primary application/site and draws the most frequent changes from one application to another.
+
+- Nodes represent the applications with the most recorded time; their size follows relative time, not productivity.
+- Lines represent observed switches between those applications within a day. They are not a claim of causality or task completion.
+- The pattern and distraction panels use the same recorded transitions. When a card has no application/site metadata, Dayflow excludes it from this section instead of guessing.
+- Use the download control on hover to export the graph as a PNG.
+
 ## Morning Setup
 
 When Dayflow asks, "Where do you want to spend your time today?", treat the screen in two layers.

@@ -4,6 +4,11 @@ This file tracks local fork work that may or may not be suitable for upstream Da
 
 ## 2026-09-06
 
+- Wired the existing application-interaction analysis into the active Weekly dashboard:
+  - the section uses live `WeeklyDashboardBuilder` application facts and transitions, not the preview fixture;
+  - it scales with the weekly dashboard and can be exported as a PNG;
+  - app-less, system, and idle cards remain excluded rather than producing invented application relationships.
+
 - Completed the next Personal Assistant review loop:
   - timed manual captures now render as explicitly manual dashed intervals on the Day timeline;
   - tasks can retain explicit capture links and user-confirmed likely desktop-card evidence without being marked complete;

@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct WeeklyApplicationInteractionsSection: View {
+  static let designWidth: CGFloat = 958
+  static let designHeight: CGFloat = 561
+
   let snapshot: WeeklyApplicationInteractionsSnapshot
 
   var body: some View {
@@ -11,7 +14,7 @@ struct WeeklyApplicationInteractionsSection: View {
       WeeklyApplicationPatternsPane(snapshot: snapshot)
         .frame(width: 393, height: 561)
     }
-    .frame(width: 958, height: 561, alignment: .topLeading)
+    .frame(width: Self.designWidth, height: Self.designHeight, alignment: .topLeading)
     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
   }
 }

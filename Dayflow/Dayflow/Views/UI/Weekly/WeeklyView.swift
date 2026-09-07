@@ -159,6 +159,23 @@ struct WeeklyView: View {
 
               WeeklyExportableGraphic(
                 layout: layout,
+                title: "Application interactions",
+                headerTitle: "Interactions between most used applications",
+                downloadButtonOrigin: CGPoint(
+                  x: layout.contentWidth * 29 / WeeklyApplicationInteractionsSection.designWidth,
+                  y: layout.contentWidth * 28 / WeeklyApplicationInteractionsSection.designWidth
+                ),
+                fileName: exportFileName("application-interactions"),
+                exportWidth: WeeklyApplicationInteractionsSection.designWidth,
+                displayHeight: layout.applicationInteractionsHeight,
+                exportHeight: WeeklyApplicationInteractionsSection.designHeight,
+                watermarkPlacement: .bottomTrailing
+              ) { width in
+                scaledApplicationInteractions(snapshot: dashboardSnapshot.applicationInteractions, width: width)
+              }
+
+              WeeklyExportableGraphic(
+                layout: layout,
                 title: "Weekly breakdown",
                 downloadButtonOrigin: CGPoint(
                   x: layout.contentWidth * 72 / 1748,
@@ -245,6 +262,20 @@ struct WeeklyView: View {
         width: cardWidth
       )
     }
+  }
+
+  private func scaledApplicationInteractions(
+    snapshot: WeeklyApplicationInteractionsSnapshot,
+    width: CGFloat
+  ) -> some View {
+    let scale = width / WeeklyApplicationInteractionsSection.designWidth
+    return WeeklyApplicationInteractionsSection(snapshot: snapshot)
+      .scaleEffect(scale, anchor: .topLeading)
+      .frame(
+        width: width,
+        height: WeeklyApplicationInteractionsSection.designHeight * scale,
+        alignment: .topLeading
+      )
   }
 
   private static let weeklyDataRequirementMinutes = 15 * 60
@@ -579,6 +610,7 @@ private struct WeeklyAdaptiveLayout {
   static let suggestionsHeight: CGFloat = 328
   static let treemapHeight: CGFloat = 549
   static let heatmapHeight: CGFloat = 238
+  static let applicationInteractionsDesignHeight: CGFloat = WeeklyApplicationInteractionsSection.designHeight
   static let dataGateHeight: CGFloat = 360
   static let designSankeyHeight: CGFloat = designContentWidth * 933 / 1748
   static let maximumContentWidth: CGFloat = 1500
@@ -608,6 +640,10 @@ private struct WeeklyAdaptiveLayout {
 
   var sankeyHeight: CGFloat {
     contentWidth * 933 / 1748
+  }
+
+  var applicationInteractionsHeight: CGFloat {
+    contentWidth * Self.applicationInteractionsDesignHeight / Self.designContentWidth
   }
 
   var sectionSpacing: CGFloat {
