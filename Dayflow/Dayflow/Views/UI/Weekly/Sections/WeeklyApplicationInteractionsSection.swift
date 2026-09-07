@@ -460,9 +460,18 @@ private extension WeeklyInteractionGraphGlyph {
     if normalized.contains("figma") { return .figma }
     if normalized.contains("chatgpt") { return .symbol("sparkles", backgroundHex: "1F1F1F", foregroundHex: "FFFFFF") }
     if normalized.contains("claude") { return .symbol("sun.max.fill", backgroundHex: "D97757", foregroundHex: "FFFFFF") }
+    if normalized.contains("gemini") { return .symbol("sparkles", backgroundHex: "4779E9", foregroundHex: "FFFFFF") }
     if normalized.contains("cursor") || normalized.contains("codex") { return .symbol("cursorarrow", backgroundHex: "2B2724", foregroundHex: "FFFFFF") }
     if normalized.contains("github") { return .symbol("chevron.left.forwardslash.chevron.right", backgroundHex: "24292F", foregroundHex: "FFFFFF") }
+    if normalized.contains("medium") { return .symbol("text.book.closed.fill", backgroundHex: "1F1F1F", foregroundHex: "FFFFFF") }
+    if normalized.contains("heygen") || normalized.contains("hyperagent") {
+      return .symbol("person.crop.circle.fill", backgroundHex: "7A62D3", foregroundHex: "FFFFFF")
+    }
+    if normalized.contains("linkedin") { return .symbol("person.2.fill", backgroundHex: "0A66C2", foregroundHex: "FFFFFF") }
+    if normalized.contains("obsidian") { return .symbol("diamond.fill", backgroundHex: "6E5BD5", foregroundHex: "FFFFFF") }
+    if normalized.contains("dayflow") { return .symbol("clock.fill", backgroundHex: "DF8351", foregroundHex: "FFFFFF") }
     if normalized.contains("mail") || normalized.contains("gmail") { return .symbol("envelope.fill", backgroundHex: "D95040", foregroundHex: "FFFFFF") }
+    if normalized.contains("google") { return .symbol("magnifyingglass", backgroundHex: "4285F4", foregroundHex: "FFFFFF") }
     if normalized.contains("calendar") { return .symbol("calendar", backgroundHex: "4779E9", foregroundHex: "FFFFFF") }
     if normalized.contains("chrome") || normalized.contains("safari") || normalized.contains("web") { return .symbol("globe", backgroundHex: "4779E9", foregroundHex: "FFFFFF") }
     let letter = name.trimmingCharacters(in: .whitespacesAndNewlines).first.map(String.init) ?? "?"

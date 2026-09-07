@@ -162,9 +162,10 @@ struct WeeklyView: View {
                 title: "Application interactions",
                 headerTitle: "Interactions between most used applications",
                 downloadButtonOrigin: CGPoint(
-                  x: layout.interactionGraphOriginX + WeeklyInteractionGraphPrototypeSection.Design.titleOrigin.x * layout.interactionGraphScale,
-                  y: WeeklyInteractionGraphPrototypeSection.Design.titleOrigin.y * layout.interactionGraphScale
+                  x: layout.interactionGraphOriginX + layout.interactionGraphRenderedWidth - 38,
+                  y: 18
                 ),
+                downloadButtonPlacement: .standalone,
                 fileName: exportFileName("application-interactions"),
                 exportWidth: WeeklyInteractionGraphPrototypeSection.Design.sectionSize.width,
                 displayHeight: layout.interactionGraphHeight,
@@ -694,6 +695,7 @@ private struct WeeklyExportableGraphic<Content: View>: View {
   let title: String
   let headerTitle: String
   let downloadButtonOrigin: CGPoint
+  let downloadButtonPlacement: WeeklyGraphicDownloadPlacement
   let fileName: String
   let exportWidth: CGFloat
   let displayHeight: CGFloat
@@ -709,6 +711,7 @@ private struct WeeklyExportableGraphic<Content: View>: View {
     title: String,
     headerTitle: String? = nil,
     downloadButtonOrigin: CGPoint,
+    downloadButtonPlacement: WeeklyGraphicDownloadPlacement = .afterHeader,
     fileName: String,
     exportWidth: CGFloat = WeeklyAdaptiveLayout.designContentWidth,
     displayHeight: CGFloat,
@@ -721,6 +724,7 @@ private struct WeeklyExportableGraphic<Content: View>: View {
     self.title = title
     self.headerTitle = headerTitle ?? title
     self.downloadButtonOrigin = downloadButtonOrigin
+    self.downloadButtonPlacement = downloadButtonPlacement
     self.fileName = fileName
     self.exportWidth = exportWidth
     self.displayHeight = displayHeight
@@ -735,6 +739,7 @@ private struct WeeklyExportableGraphic<Content: View>: View {
     title: String,
     headerTitle: String? = nil,
     downloadButtonOrigin: CGPoint,
+    downloadButtonPlacement: WeeklyGraphicDownloadPlacement = .afterHeader,
     fileName: String,
     exportWidth: CGFloat = WeeklyAdaptiveLayout.designContentWidth,
     displayHeight: CGFloat,
@@ -747,6 +752,7 @@ private struct WeeklyExportableGraphic<Content: View>: View {
       title: title,
       headerTitle: headerTitle,
       downloadButtonOrigin: downloadButtonOrigin,
+      downloadButtonPlacement: downloadButtonPlacement,
       fileName: fileName,
       exportWidth: exportWidth,
       displayHeight: displayHeight,
@@ -774,6 +780,7 @@ private struct WeeklyExportableGraphic<Content: View>: View {
           title: title,
           headerTitle: headerTitle,
           origin: downloadButtonOrigin,
+          placement: downloadButtonPlacement,
           isVisible: isHovering
         ) {
           WeeklyGraphicExporter.savePNG(
@@ -844,6 +851,7 @@ private struct WeeklyExportableFixedGraphic<Content: View>: View {
           title: title,
           headerTitle: headerTitle,
           origin: downloadButtonOrigin,
+          placement: .afterHeader,
           isVisible: isHovering
         ) {
           WeeklyGraphicExporter.savePNG(
@@ -867,24 +875,37 @@ private struct WeeklyGraphicDownloadOverlay: View {
   let title: String
   let headerTitle: String
   let origin: CGPoint
+  let placement: WeeklyGraphicDownloadPlacement
   let isVisible: Bool
   let action: () -> Void
 
   var body: some View {
-    HStack(spacing: 8) {
-      Text(headerTitle)
-        .font(.custom("InstrumentSerif-Regular", size: 20))
-        .lineLimit(1)
-        .fixedSize()
-        .opacity(0)
-        .allowsHitTesting(false)
+    Group {
+      switch placement {
+      case .afterHeader:
+        HStack(spacing: 8) {
+          Text(headerTitle)
+            .font(.custom("InstrumentSerif-Regular", size: 20))
+            .lineLimit(1)
+            .fixedSize()
+            .opacity(0)
+            .allowsHitTesting(false)
 
-      WeeklyGraphicDownloadButton(title: title, action: action)
+          WeeklyGraphicDownloadButton(title: title, action: action)
+        }
+      case .standalone:
+        WeeklyGraphicDownloadButton(title: title, action: action)
+      }
     }
     .offset(x: origin.x, y: origin.y)
     .opacity(isVisible ? 1 : 0)
     .allowsHitTesting(isVisible)
   }
+}
+
+private enum WeeklyGraphicDownloadPlacement {
+  case afterHeader
+  case standalone
 }
 
 private struct WeeklyGraphicDownloadButton: View {
