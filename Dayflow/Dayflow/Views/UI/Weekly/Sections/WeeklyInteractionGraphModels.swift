@@ -91,6 +91,10 @@ struct WeeklyInteractionGraphNode: Identifiable {
   let category: WeeklyInteractionGraphCategory
   let glyph: WeeklyInteractionGraphGlyph
   let importanceBoost: CGFloat
+  let totalMinutes: Int
+  let workMinutes: Int
+  let personalMinutes: Int
+  let distractionMinutes: Int
   let faviconPrimaryRaw: String?
   let faviconSecondaryRaw: String?
   let faviconPrimaryHost: String?
@@ -102,6 +106,10 @@ struct WeeklyInteractionGraphNode: Identifiable {
     category: WeeklyInteractionGraphCategory,
     glyph: WeeklyInteractionGraphGlyph,
     importanceBoost: CGFloat = 0,
+    totalMinutes: Int = 0,
+    workMinutes: Int = 0,
+    personalMinutes: Int = 0,
+    distractionMinutes: Int = 0,
     faviconPrimaryRaw: String? = nil,
     faviconSecondaryRaw: String? = nil,
     faviconPrimaryHost: String? = nil,
@@ -112,6 +120,10 @@ struct WeeklyInteractionGraphNode: Identifiable {
     self.category = category
     self.glyph = glyph
     self.importanceBoost = importanceBoost
+    self.totalMinutes = totalMinutes
+    self.workMinutes = workMinutes
+    self.personalMinutes = personalMinutes
+    self.distractionMinutes = distractionMinutes
     self.faviconPrimaryRaw = faviconPrimaryRaw
     self.faviconSecondaryRaw = faviconSecondaryRaw
     self.faviconPrimaryHost = faviconPrimaryHost
@@ -124,17 +136,20 @@ struct WeeklyInteractionGraphEdge: Identifiable {
   let sourceID: String
   let targetID: String
   let weight: CGFloat
+  let transitionCount: Int
 
   init(
     id: String,
     sourceID: String,
     targetID: String,
-    weight: CGFloat = 1
+    weight: CGFloat = 1,
+    transitionCount: Int = 0
   ) {
     self.id = id
     self.sourceID = sourceID
     self.targetID = targetID
     self.weight = weight
+    self.transitionCount = transitionCount
   }
 }
 

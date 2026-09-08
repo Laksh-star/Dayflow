@@ -100,7 +100,8 @@ extension WeeklyDashboardBuilder {
         to: to.key,
         kind: edgeKind(from: from.kind, to: to.kind),
         weight: Double(transition.count) / Double(maxTransitionCount),
-        curveOffset: curveOffsets[index % curveOffsets.count]
+        curveOffset: curveOffsets[index % curveOffsets.count],
+        transitionCount: transition.count
       )
     }
 
@@ -129,6 +130,15 @@ extension WeeklyDashboardBuilder {
       let first = appFacts[0]
       let faviconSource = appFacts.first(where: \.hasFaviconLookupSource) ?? first
       let minutes = appFacts.reduce(0) { $0 + $1.durationMinutes }
+      let workMinutes = appFacts
+        .filter { $0.appKind == .work }
+        .reduce(0) { $0 + $1.durationMinutes }
+      let personalMinutes = appFacts
+        .filter { $0.appKind == .personal }
+        .reduce(0) { $0 + $1.durationMinutes }
+      let distractionMinutes = appFacts
+        .filter { $0.appKind == .distraction }
+        .reduce(0) { $0 + $1.durationMinutes }
       let visits = appFacts.count
       let kind = resolvedAppKind(from: appFacts)
       return WeeklyAppAggregate(
@@ -138,6 +148,9 @@ extension WeeklyDashboardBuilder {
         kind: kind,
         minutes: minutes,
         visits: visits,
+        workMinutes: workMinutes,
+        personalMinutes: personalMinutes,
+        distractionMinutes: distractionMinutes,
         faviconPrimaryRaw: faviconSource.faviconPrimaryRaw,
         faviconSecondaryRaw: faviconSource.faviconSecondaryRaw,
         faviconPrimaryHost: faviconSource.faviconPrimaryHost,
@@ -187,6 +200,10 @@ extension WeeklyDashboardBuilder {
         mark: appInitial(app.name),
         isPrimary: index == 0,
         isMuted: index > 5,
+        totalMinutes: app.minutes,
+        workMinutes: app.workMinutes,
+        personalMinutes: app.personalMinutes,
+        distractionMinutes: app.distractionMinutes,
         faviconPrimaryRaw: app.faviconPrimaryRaw,
         faviconSecondaryRaw: app.faviconSecondaryRaw,
         faviconPrimaryHost: app.faviconPrimaryHost,
@@ -291,6 +308,9 @@ extension WeeklyDashboardBuilder {
         kind: .work,
         minutes: 0,
         visits: 1,
+        workMinutes: 0,
+        personalMinutes: 0,
+        distractionMinutes: 0,
         faviconPrimaryRaw: nil,
         faviconSecondaryRaw: nil,
         faviconPrimaryHost: nil,
@@ -421,6 +441,9 @@ private struct WeeklyAppAggregate {
   let kind: WeeklyApplicationKind
   let minutes: Int
   let visits: Int
+  let workMinutes: Int
+  let personalMinutes: Int
+  let distractionMinutes: Int
   let faviconPrimaryRaw: String?
   let faviconSecondaryRaw: String?
   let faviconPrimaryHost: String?

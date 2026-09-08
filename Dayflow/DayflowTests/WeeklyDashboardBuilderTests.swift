@@ -86,10 +86,11 @@ final class WeeklyDashboardBuilderTests: XCTestCase {
       weekRange: weekRange
     )
 
-    XCTAssertEqual(
-      snapshot.applicationInteractions.nodes.first(where: { $0.id == "chatgpt" })?.kind,
-      .work
-    )
+    let chatGPT = snapshot.applicationInteractions.nodes.first(where: { $0.id == "chatgpt" })
+    XCTAssertEqual(chatGPT?.kind, .work)
+    XCTAssertEqual(chatGPT?.totalMinutes, 75)
+    XCTAssertEqual(chatGPT?.workMinutes, 60)
+    XCTAssertEqual(chatGPT?.distractionMinutes, 15)
   }
 
   private func card(

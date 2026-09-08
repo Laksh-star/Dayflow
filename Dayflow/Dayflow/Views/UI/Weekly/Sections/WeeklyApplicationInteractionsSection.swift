@@ -417,6 +417,10 @@ extension WeeklyApplicationInteractionsSnapshot {
         category: node.kind.graphCategory,
         glyph: WeeklyInteractionGraphGlyph.liveAppGlyph(for: node.name),
         importanceBoost: node.isPrimary ? 0.5 : (node.isMuted ? -0.05 : 0),
+        totalMinutes: node.totalMinutes,
+        workMinutes: node.workMinutes,
+        personalMinutes: node.personalMinutes,
+        distractionMinutes: node.distractionMinutes,
         faviconPrimaryRaw: node.faviconPrimaryRaw,
         faviconSecondaryRaw: node.faviconSecondaryRaw,
         faviconPrimaryHost: node.faviconPrimaryHost,
@@ -428,7 +432,8 @@ extension WeeklyApplicationInteractionsSnapshot {
         id: "\(edge.from)-\(edge.to)",
         sourceID: edge.from,
         targetID: edge.to,
-        weight: CGFloat(edge.weight)
+        weight: CGFloat(edge.weight),
+        transitionCount: edge.transitionCount
       )
     }
     return WeeklyInteractionGraphSnapshot(
@@ -493,6 +498,10 @@ struct WeeklyApplicationNode: Identifiable {
   let mark: String
   let isPrimary: Bool
   let isMuted: Bool
+  let totalMinutes: Int
+  let workMinutes: Int
+  let personalMinutes: Int
+  let distractionMinutes: Int
   let faviconPrimaryRaw: String?
   let faviconSecondaryRaw: String?
   let faviconPrimaryHost: String?
@@ -508,6 +517,10 @@ struct WeeklyApplicationNode: Identifiable {
     mark: String,
     isPrimary: Bool = false,
     isMuted: Bool = false,
+    totalMinutes: Int = 0,
+    workMinutes: Int = 0,
+    personalMinutes: Int = 0,
+    distractionMinutes: Int = 0,
     faviconPrimaryRaw: String? = nil,
     faviconSecondaryRaw: String? = nil,
     faviconPrimaryHost: String? = nil,
@@ -522,6 +535,10 @@ struct WeeklyApplicationNode: Identifiable {
     self.mark = mark
     self.isPrimary = isPrimary
     self.isMuted = isMuted
+    self.totalMinutes = totalMinutes
+    self.workMinutes = workMinutes
+    self.personalMinutes = personalMinutes
+    self.distractionMinutes = distractionMinutes
     self.faviconPrimaryRaw = faviconPrimaryRaw
     self.faviconSecondaryRaw = faviconSecondaryRaw
     self.faviconPrimaryHost = faviconPrimaryHost
@@ -554,6 +571,23 @@ struct WeeklyApplicationEdge: Identifiable {
   let kind: WeeklyApplicationKind
   let weight: Double
   let curveOffset: CGFloat
+  let transitionCount: Int
+
+  init(
+    from: String,
+    to: String,
+    kind: WeeklyApplicationKind,
+    weight: Double,
+    curveOffset: CGFloat,
+    transitionCount: Int = 0
+  ) {
+    self.from = from
+    self.to = to
+    self.kind = kind
+    self.weight = weight
+    self.curveOffset = curveOffset
+    self.transitionCount = transitionCount
+  }
 
   var color: Color {
     switch kind {

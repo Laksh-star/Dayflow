@@ -3,6 +3,7 @@ import SwiftUI
 
 struct WeeklyInteractionGraphNodeBadge: View {
   let node: WeeklyInteractionGraphNodeLayout
+  let isSelected: Bool
 
   var shellGradient: LinearGradient {
     switch node.category {
@@ -44,6 +45,12 @@ struct WeeklyInteractionGraphNodeBadge: View {
 
       WeeklyInteractionGraphResolvedIconView(node: node)
       .padding(node.diameter * 0.2)
+
+      if isSelected {
+        Circle()
+          .stroke(Color(hex: "2A2521"), lineWidth: 2)
+          .padding(-5)
+      }
     }
     .accessibilityLabel(node.node.title)
     .help(node.node.title)

@@ -21,7 +21,9 @@ This guide covers the fork-specific workflow in `Dayflow Dev`.
 The Weekly dashboard now includes **Interactions between most used applications** after the Focus breakdown. It groups the week's non-system, non-idle timeline cards by their recorded primary application/site and draws the most frequent changes from one application to another.
 
 - Nodes represent the applications with the most recorded time; their size follows relative time, not productivity.
-- Lines represent observed switches between those applications within a day. They are not a claim of causality or task completion.
+- Select a node to inspect its total recorded time, work/personal/distraction split, and its strongest visible application switches.
+- Node colour uses the dominant recorded context by minutes. An app is not marked as a distraction because of one short distraction interval.
+- Lines represent observed switches between those applications within a day. They are not a claim of causality or task completion, and graph position has no semantic meaning.
 - The pattern and distraction panels use the same recorded transitions. When a card has no application/site metadata, Dayflow excludes it from this section instead of guessing.
 - Use the download control on hover to export the graph as a PNG.
 
