@@ -207,7 +207,19 @@ struct DayReviewAssistantView: View {
   }
 
   private var conversationSection: some View {
-    reviewSectionCard(title: "Ask about this day", subtitle: "Uses this day's evidence. OpenAI is used only when you press Ask and it is configured directly.") {
+    reviewSectionCard(title: "Ask about this day", subtitle: "Review only this day's recorded evidence. OpenAI is used only when you ask and it is configured directly.") {
+      VStack(alignment: .leading, spacing: 8) {
+        Text("Guided review")
+          .font(.custom("Figtree", size: 12).weight(.semibold))
+          .foregroundColor(SettingsStyle.secondary)
+        HStack(spacing: 8) {
+          ForEach(DayReviewPrompt.allCases) { prompt in
+            Button(prompt.title) { ask(prompt) }
+              .buttonStyle(.bordered)
+              .disabled(isAnswering)
+          }
+        }
+      }
       if !voiceService.transcript.isEmpty {
         Text(voiceService.transcript)
           .font(.custom("Figtree", size: 13))
@@ -357,6 +369,15 @@ struct DayReviewAssistantView: View {
   private func answerQuestion() {
     let requestedQuestion = question.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !requestedQuestion.isEmpty, !isAnswering else { return }
+    answerQuestion(requestedQuestion)
+  }
+
+  private func ask(_ prompt: DayReviewPrompt) {
+    question = prompt.question
+    answerQuestion(prompt.question)
+  }
+
+  private func answerQuestion(_ requestedQuestion: String) {
     isAnswering = true
     answer = ""
     Task {
@@ -369,24 +390,11 @@ struct DayReviewAssistantView: View {
         }
       } catch {
         await MainActor.run {
-          answer = localAnswer(for: requestedQuestion)
+          answer = DayReviewAnswerService.localAnswer(question: requestedQuestion, cards: cards, tasks: tasks, captures: captures)
           answerSource = "Local evidence fallback: \(error.localizedDescription)"
           isAnswering = false
         }
       }
-    }
-  }
-
-  private func localAnswer(for prompt: String) -> String {
-    let normalized = prompt.lowercased()
-    if normalized.contains("unfinished") || normalized.contains("task") {
-      let open = tasks.filter { $0.status != .done && $0.status != .dropped }.map(\.title)
-      return open.isEmpty ? "There are no unfinished tasks for this day." : "Still open: \(open.joined(separator: ", "))."
-    } else if normalized.contains("capture") || normalized.contains("offline") {
-      return captures.isEmpty ? "There are no manual captures for this day." : "Manual captures: \(captures.map(\.body).joined(separator: "; "))."
-    } else {
-      let titles = cards.prefix(4).map(\.title)
-      return titles.isEmpty ? "There are no processed desktop cards for this day yet." : "Dayflow recorded \(cards.count) desktop activity cards. The main threads were: \(titles.joined(separator: "; "))."
     }
   }
 

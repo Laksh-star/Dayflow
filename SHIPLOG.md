@@ -19,6 +19,7 @@ This file tracks local fork work that may or may not be suitable for upstream Da
   - tasks can retain explicit capture links and user-confirmed likely desktop-card evidence without being marked complete;
   - **Ask about this day** now uses the configured direct OpenAI provider only after an explicit Ask action, with a local evidence-only fallback on configuration or request failure;
   - added a user-selected folder importer for structured mobile JSON captures, with source files preserved and duplicate imports blocked by an import receipt.
+  - added guided day-review actions for confirmed completion, open work, and a single evidence-backed next step; freeform typed and voice questions remain available.
 
 - Added the first integrated Personal Assistant workspace:
   - local tasks, manual captures, and review decisions stored separately from automated timeline cards;
