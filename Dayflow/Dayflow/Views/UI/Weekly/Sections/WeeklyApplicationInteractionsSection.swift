@@ -589,7 +589,7 @@ struct WeeklyApplicationEdge: Identifiable {
   }
 }
 
-enum WeeklyApplicationKind: Equatable {
+enum WeeklyApplicationKind: Hashable {
   case work
   case personal
   case distraction

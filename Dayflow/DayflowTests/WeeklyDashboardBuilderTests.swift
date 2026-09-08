@@ -68,6 +68,30 @@ final class WeeklyDashboardBuilderTests: XCTestCase {
     XCTAssertEqual(Set(snapshot.sankey.apps.map(\.id)).count, snapshot.sankey.apps.count)
   }
 
+  func testApplicationKindUsesMajorityOfRecordedMinutes() {
+    let weekRange = WeeklyDateRange.containing(Date(timeIntervalSince1970: 1_770_000_000))
+    let day = DateFormatter.yyyyMMdd.string(from: weekRange.weekStart)
+    let cards = [
+      card(day: day, category: "Focus", appName: "ChatGPT", minutes: 60),
+      card(day: day, category: "Distraction", appName: "ChatGPT", minutes: 15),
+    ]
+
+    let snapshot = WeeklyDashboardBuilder.build(
+      cards: cards,
+      previousWeekCards: [],
+      categories: [
+        TimelineCategory(name: "Focus", colorHex: "4F8EF7", order: 0),
+        TimelineCategory(name: "Distraction", colorHex: "FF7C5A", order: 1),
+      ],
+      weekRange: weekRange
+    )
+
+    XCTAssertEqual(
+      snapshot.applicationInteractions.nodes.first(where: { $0.id == "chatgpt" })?.kind,
+      .work
+    )
+  }
+
   private func card(
     day: String,
     category: String = "Focus",

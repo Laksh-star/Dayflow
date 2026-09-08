@@ -11,6 +11,7 @@ This file tracks local fork work that may or may not be suitable for upstream Da
   - Replaced the first live renderer with the collision-aware interaction graph treatment, using recognizable glyphs for common apps and clear monograms only as a fallback.
   - Separated the hover-only export action from the graph heading and expanded live app glyph coverage for Gemini, Medium, Hyperagent, HeyGen, LinkedIn, Obsidian, Dayflow, and Google.
   - Updated graph nodes to use installed macOS application icons first, then Dayflow's existing favicon assets and cached site favicons, with vector glyphs retained only as a resilient fallback.
+  - Changed graph colour classification to use the dominant recorded context by minutes, rather than marking an application as a distraction after a single distraction-labelled interval.
 
 - Completed the next Personal Assistant review loop:
   - timed manual captures now render as explicitly manual dashed intervals on the Day timeline;

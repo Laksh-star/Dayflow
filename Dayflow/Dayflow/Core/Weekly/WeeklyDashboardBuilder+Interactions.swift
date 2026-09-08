@@ -365,13 +365,19 @@ extension WeeklyDashboardBuilder {
   }
 
   private static func resolvedAppKind(from facts: [WeeklyCardFact]) -> WeeklyApplicationKind {
-    if facts.contains(where: { $0.appKind == .distraction }) {
-      return .distraction
+    let minutesByKind = facts.reduce(into: [WeeklyApplicationKind: Int]()) { totals, fact in
+      totals[fact.appKind, default: 0] += fact.durationMinutes
     }
-    if facts.contains(where: { $0.appKind == .personal }) {
-      return .personal
-    }
-    return .work
+    let tieBreakOrder: [WeeklyApplicationKind] = [.work, .personal, .distraction]
+
+    return tieBreakOrder.max { lhs, rhs in
+      let leftMinutes = minutesByKind[lhs, default: 0]
+      let rightMinutes = minutesByKind[rhs, default: 0]
+      if leftMinutes == rightMinutes {
+        return tieBreakOrder.firstIndex(of: lhs)! > tieBreakOrder.firstIndex(of: rhs)!
+      }
+      return leftMinutes < rightMinutes
+    } ?? .work
   }
 
   private static func patternApp(_ aggregate: WeeklyAppAggregate) -> WeeklyPatternApp {
