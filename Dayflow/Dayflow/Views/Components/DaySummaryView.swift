@@ -440,6 +440,8 @@ struct DaySummaryView: View {
         plan: plan,
         categories: selectableCategories,
         setupReferenceStats: goalSetupReferenceStats,
+        morningTasks: storageManager.fetchTasks(forDay: timelineDayInfo.dayString)
+          .filter { $0.status != .done && $0.status != .dropped },
         initialScreen: resolvedInitialScreen,
         onSkip: skipGoalPlan,
         onConfirm: confirmGoalPlan,

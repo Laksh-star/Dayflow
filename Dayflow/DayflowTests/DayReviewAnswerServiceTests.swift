@@ -39,6 +39,16 @@ final class DayReviewAnswerServiceTests: XCTestCase {
     XCTAssertTrue(answer.contains("matching activity"))
   }
 
+  func testRecommendedTaskPrefersOpenTaskWithMatchingEvidence() {
+    let recommended = DayReviewAnswerService.recommendedTask(
+      from: [task("Prepare proposal", status: .planned), task("Archive receipts", status: .planned)],
+      cards: [],
+      captures: [capture("Prepared a proposal outline")]
+    )
+
+    XCTAssertEqual(recommended?.title, "Prepare proposal")
+  }
+
   func testNextFallbackDoesNotChooseWithoutEvidence() {
     let answer = DayReviewAnswerService.localAnswer(
       question: DayReviewPrompt.next.question,

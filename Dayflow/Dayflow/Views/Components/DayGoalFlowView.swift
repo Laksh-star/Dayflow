@@ -66,6 +66,7 @@ struct DayGoalFlowPresentation: Identifiable {
   let plan: DayGoalPlan
   let categories: [TimelineCategory]
   let setupReferenceStats: DayGoalSetupReferenceStats
+  let morningTasks: [DayflowTask]
   let initialScreen: DayGoalFlowInitialScreen
   var onSkip: () -> Void
   var onConfirm: (DayGoalPlan) -> Void
@@ -97,6 +98,7 @@ struct DayGoalFlowOverlay: View {
           plan: presentation.plan,
           categories: presentation.categories,
           setupReferenceStats: presentation.setupReferenceStats,
+          morningTasks: presentation.morningTasks,
           initialScreen: presentation.initialScreen,
           onSkip: {
             presentation.onSkip()
@@ -123,6 +125,7 @@ struct DayGoalFlowView: View {
   let review: DayGoalReviewSnapshot
   let categories: [TimelineCategory]
   let setupReferenceStats: DayGoalSetupReferenceStats
+  let morningTasks: [DayflowTask]
   let initialScreen: DayGoalFlowInitialScreen
   var onSkip: () -> Void
   var onConfirm: (DayGoalPlan) -> Void
@@ -137,6 +140,7 @@ struct DayGoalFlowView: View {
     plan: DayGoalPlan,
     categories: [TimelineCategory],
     setupReferenceStats: DayGoalSetupReferenceStats = .empty,
+    morningTasks: [DayflowTask] = [],
     initialScreen: DayGoalFlowInitialScreen = .review,
     onSkip: @escaping () -> Void,
     onConfirm: @escaping (DayGoalPlan) -> Void,
@@ -146,6 +150,7 @@ struct DayGoalFlowView: View {
     self.review = review
     self.categories = categories
     self.setupReferenceStats = setupReferenceStats
+    self.morningTasks = morningTasks
     self.initialScreen = initialScreen
     self.onSkip = onSkip
     self.onConfirm = onConfirm
@@ -156,7 +161,7 @@ struct DayGoalFlowView: View {
   }
 
   private enum Design {
-    static let canvasSize = CGSize(width: 1200, height: 930)
+    static let canvasWidth: CGFloat = 1200
     static let backgroundTop = Color(hex: "FFF3EC")
     static let backgroundBottom = Color(hex: "FF8046").opacity(0.78)
     static let orange = Color(hex: "FF8046")
@@ -179,7 +184,7 @@ struct DayGoalFlowView: View {
           setupScreen
         }
       }
-      .frame(width: Design.canvasSize.width, height: Design.canvasSize.height)
+      .frame(width: Design.canvasWidth, height: canvasHeight)
       .scaleEffect(scale)
       .frame(width: geometry.size.width, height: geometry.size.height, alignment: .center)
     }
@@ -191,8 +196,8 @@ struct DayGoalFlowView: View {
     let availableHeight = max(1, size.height - (margin * 2))
     return min(
       1,
-      availableWidth / Design.canvasSize.width,
-      availableHeight / Design.canvasSize.height
+      availableWidth / Design.canvasWidth,
+      availableHeight / canvasHeight
     )
   }
 
@@ -241,14 +246,21 @@ struct DayGoalFlowView: View {
   private var setupScreen: some View {
     let focusStats = setupStats(for: .focus)
     let distractionStats = setupStats(for: .distraction)
+    let queueOffset: CGFloat = morningTasks.isEmpty ? 0 : 58
 
     return ZStack(alignment: .topLeading) {
       Text("Where do you want to spend your time today?")
         .font(.custom("Instrument Serif", size: 24))
         .foregroundColor(.black)
         .multilineTextAlignment(.center)
-        .frame(width: 620, height: 30)
-        .position(x: 602, y: 64)
+      .frame(width: 620, height: 30)
+      .position(x: 602, y: 64)
+
+      if !morningTasks.isEmpty {
+        morningTaskQueue
+          .frame(width: 804, height: 42)
+          .position(x: 602, y: 104)
+      }
 
       VStack(alignment: .leading, spacing: 4) {
         Text("1. Set day targets")
@@ -259,7 +271,7 @@ struct DayGoalFlowView: View {
           .foregroundColor(Color(hex: "6C625B"))
       }
       .frame(width: 804, alignment: .leading)
-      .position(x: 602, y: 116)
+      .position(x: 602, y: 116 + queueOffset)
 
       GoalCategoryPool(
         categories: unassignedCategories,
@@ -268,7 +280,7 @@ struct DayGoalFlowView: View {
         onCycle: cycleCategoryAssignment
       )
       .frame(width: 804, height: 87)
-      .position(x: 601.86, y: 198.5)
+      .position(x: 601.86, y: 198.5 + queueOffset)
 
       GoalSetupPanel(
         kind: .focus,
@@ -284,7 +296,7 @@ struct DayGoalFlowView: View {
         onDropCategory: { moveCategoryFromDrop($0, to: .focus) }
       )
       .frame(width: 396, height: 321)
-      .position(x: 397.86, y: 411.5)
+      .position(x: 397.86, y: 411.5 + queueOffset)
 
       GoalSetupPanel(
         kind: .distraction,
@@ -300,7 +312,7 @@ struct DayGoalFlowView: View {
         onDropCategory: { moveCategoryFromDrop($0, to: .distraction) }
       )
       .frame(width: 400.28, height: 323)
-      .position(x: 804, y: 412.5)
+      .position(x: 804, y: 412.5 + queueOffset)
 
       VStack(alignment: .leading, spacing: 4) {
         Text("2. Add focus windows (optional)")
@@ -311,7 +323,7 @@ struct DayGoalFlowView: View {
           .foregroundColor(Color(hex: "6C625B"))
       }
       .frame(width: 804, alignment: .leading)
-      .position(x: 602, y: 585)
+      .position(x: 602, y: 585 + queueOffset)
 
       DayFocusWindowEditor(
         windows: $draft.focusWindows,
@@ -319,7 +331,7 @@ struct DayGoalFlowView: View {
         onChanged: normalizeFocusWindows
       )
       .frame(width: 804)
-      .position(x: 602, y: 718)
+      .position(x: 602, y: 718 + queueOffset)
 
       HStack(spacing: 10) {
         secondaryButton("Skip today", action: onSkip)
@@ -336,8 +348,31 @@ struct DayGoalFlowView: View {
           onConfirm(plan)
         }
       }
-      .position(x: 607.45, y: 872)
+      .position(x: 607.45, y: 872 + queueOffset)
     }
+  }
+
+  private var canvasHeight: CGFloat {
+    morningTasks.isEmpty ? 930 : 988
+  }
+
+  private var morningTaskQueue: some View {
+    VStack(alignment: .leading, spacing: 3) {
+      Text("Today's task queue")
+        .font(.custom("Figtree", size: 12).weight(.semibold))
+        .foregroundColor(Design.text)
+      Text(morningTasks.prefix(3).map(\.title).joined(separator: "  •  "))
+        .font(.custom("Figtree", size: 11))
+        .foregroundColor(Color(hex: "6C625B"))
+        .lineLimit(1)
+      Text("Tasks stay separate from focus targets and recorded time.")
+        .font(.custom("Figtree", size: 10))
+        .foregroundColor(Color(hex: "6C625B"))
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 6)
+    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.64)))
+    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black.opacity(0.08), lineWidth: 1))
   }
 
   private var selectableCategories: [TimelineCategory] {

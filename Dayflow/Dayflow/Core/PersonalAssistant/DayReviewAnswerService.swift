@@ -116,7 +116,7 @@ struct DayReviewAnswerService {
     return titles.isEmpty ? "There are no processed desktop cards for this day yet." : "Dayflow recorded \(cards.count) desktop activity cards. The main threads were: \(titles.joined(separator: "; "))."
   }
 
-  private static func recommendedTask(from tasks: [DayflowTask], cards: [TimelineCard], captures: [ManualCapture]) -> DayflowTask? {
+  static func recommendedTask(from tasks: [DayflowTask], cards: [TimelineCard], captures: [ManualCapture]) -> DayflowTask? {
     tasks.max { lhs, rhs in
       evidenceScore(for: lhs, cards: cards, captures: captures) < evidenceScore(for: rhs, cards: cards, captures: captures)
     }.flatMap { task in

@@ -23,6 +23,7 @@ struct DayReviewAssistantView: View {
   @State private var isShowingCaptureForm = false
   @State private var isAnswering = false
   @State private var answerSource = ""
+  @State private var recommendedTask: DayflowTask?
   @State private var inboxStatus = ""
 
   var body: some View {
@@ -250,6 +251,10 @@ struct DayReviewAssistantView: View {
           Text(answer)
             .font(.custom("Figtree", size: 14))
           if !answerSource.isEmpty { emptyText(answerSource) }
+          if let recommendedTask, recommendedTask.status != .done, recommendedTask.status != .dropped {
+            Button("Carry \(recommendedTask.title) to tomorrow") { carryForward(recommendedTask) }
+              .buttonStyle(.bordered)
+          }
           Button("Speak answer") { voiceService.speak(text: answer) }
             .buttonStyle(.bordered)
         }
@@ -380,6 +385,13 @@ struct DayReviewAssistantView: View {
   private func answerQuestion(_ requestedQuestion: String) {
     isAnswering = true
     answer = ""
+    recommendedTask = requestedQuestion.lowercased().contains("next") || requestedQuestion.lowercased().contains("resume")
+      ? DayReviewAnswerService.recommendedTask(
+        from: tasks.filter { $0.status != .done && $0.status != .dropped },
+        cards: cards,
+        captures: captures
+      )
+      : nil
     Task {
       do {
         let providerAnswer = try await DayReviewAnswerService().answer(question: requestedQuestion, day: day, cards: cards, tasks: tasks, captures: captures)
