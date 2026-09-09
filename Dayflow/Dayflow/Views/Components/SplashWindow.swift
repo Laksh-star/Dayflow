@@ -65,9 +65,7 @@ struct SplashView: View {
       Color.clear
 
       VStack(spacing: 10) {
-        Image(systemName: "sun.horizon.fill")
-          .font(.system(size: 42, weight: .medium))
-          .foregroundStyle(Color(hex: "FF7A45"))
+        DaywardBrandMark(size: 64)
 
         Text("Dayward")
           .font(.custom("Instrument Serif", size: 38))

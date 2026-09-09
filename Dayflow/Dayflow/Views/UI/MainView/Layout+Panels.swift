@@ -46,7 +46,7 @@ extension MainView {
     // Left column: Logo on top, sidebar centered
     VStack(spacing: 0) {
       // Logo area (keeps same animation)
-      LogoBadgeView(imageName: "DayflowLogoMainApp", size: LogoPosition.logoSize)
+      DaywardBrandMark(size: LogoPosition.logoSize)
         .frame(height: 100)
         .frame(maxWidth: .infinity)
         .offset(y: LogoPosition.logoVerticalOffset)
