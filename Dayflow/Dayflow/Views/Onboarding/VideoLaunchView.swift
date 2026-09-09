@@ -27,19 +27,24 @@ struct VideoLaunchView: View {
 
   var body: some View {
     ZStack {
-      if let player = player {
-        // Custom AVPlayer view without controls
-        AVPlayerControllerRepresented(player: player)
-          .ignoresSafeArea()
+      Color(hex: "FFF9F5")
+        .ignoresSafeArea()
+
+      VStack(spacing: 14) {
+        DaywardBrandMark(size: 88)
+        Text("Dayward")
+          .font(.custom("Instrument Serif", size: 48))
+          .foregroundStyle(Color(hex: "2E2925"))
+        Text("Private daily reflection")
+          .font(.custom("Figtree", size: 13).weight(.medium))
+          .foregroundStyle(Color(hex: "786E67"))
       }
     }
     .onAppear {
-      setupVideo()
-      // Focus the window
       NSApp.activate(ignoringOtherApps: true)
-    }
-    .onDisappear {
-      cleanup()
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+        completeVideo()
+      }
     }
   }
 
