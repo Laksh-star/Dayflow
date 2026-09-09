@@ -10,9 +10,9 @@ extension StorageManager {
 
     let legacyBase = fileMgr.homeDirectoryForCurrentUser
       .appendingPathComponent(
-        "Library/Containers/\(bundleID)/Data/Library/Application Support/DayflowDev", isDirectory: true
+        "Library/Containers/\(bundleID)/Data/Library/Application Support/Dayward", isDirectory: true
       )
-    let newBase = appSupport.appendingPathComponent("DayflowDev", isDirectory: true)
+    let newBase = appSupport.appendingPathComponent("Dayward", isDirectory: true)
 
     guard legacyBase.path != newBase.path else { return }
 

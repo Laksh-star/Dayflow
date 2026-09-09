@@ -1,7 +1,9 @@
 import Foundation
 
 enum StoragePathMigrator {
-  private static let migrationFlagKey = "didMigrateFromSandbox"
+  private static let migrationFlagKey = "didMigrateToDayward"
+  private static let priorDevFolder = "DayflowDev"
+  private static let supportFolder = "Dayward"
 
   static func migrateIfNeeded() {
     let defaults = UserDefaults.standard
@@ -17,18 +19,6 @@ enum StoragePathMigrator {
     }
 
     let fileManager = FileManager.default
-    let legacyBase = fileManager.homeDirectoryForCurrentUser
-      .appendingPathComponent(
-        "Library/Containers/\(bundleID)/Data/Library/Application Support/DayflowDev", isDirectory: true
-      )
-
-    guard fileManager.fileExists(atPath: legacyBase.path) else {
-      print(
-        "ℹ️ StoragePathMigrator: sandbox container absent at \(legacyBase.path); nothing to migrate")
-      defaults.set(true, forKey: migrationFlagKey)
-      return
-    }
-
     guard
       let newSupport = try? fileManager.url(
         for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
@@ -37,7 +27,39 @@ enum StoragePathMigrator {
       return
     }
 
-    let destinationBase = newSupport.appendingPathComponent("DayflowDev", isDirectory: true)
+    let destinationBase = newSupport.appendingPathComponent(supportFolder, isDirectory: true)
+    let previousDevBase = newSupport.appendingPathComponent(priorDevFolder, isDirectory: true)
+
+    // The rebrand uses a new bundle and support namespace. Copy the old fork's
+    // data once so it stays available as a rollback path.
+    let canReplaceBootstrapDestination = isBootstrapDestination(destinationBase, fileManager: fileManager)
+    if canReplaceBootstrapDestination,
+      fileManager.fileExists(atPath: previousDevBase.path)
+    {
+      do {
+        if fileManager.fileExists(atPath: destinationBase.path) {
+          try fileManager.removeItem(at: destinationBase)
+        }
+        try fileManager.copyItem(at: previousDevBase, to: destinationBase)
+        print("ℹ️ StoragePathMigrator: copied existing Dev data to \(destinationBase.path)")
+        defaults.set(true, forKey: migrationFlagKey)
+        return
+      } catch {
+        print("⚠️ StoragePathMigrator: failed to copy existing Dev data: \(error)")
+        return
+      }
+    }
+
+    let legacyBase = fileManager.homeDirectoryForCurrentUser
+      .appendingPathComponent(
+        "Library/Containers/\(bundleID)/Data/Library/Application Support/\(supportFolder)", isDirectory: true
+      )
+
+    guard fileManager.fileExists(atPath: legacyBase.path) else {
+      print("ℹ️ StoragePathMigrator: no legacy data to migrate")
+      defaults.set(true, forKey: migrationFlagKey)
+      return
+    }
 
     let normalizedLegacy = legacyBase.standardizedFileURL.path
     let normalizedDestination = destinationBase.standardizedFileURL.path
@@ -58,6 +80,14 @@ enum StoragePathMigrator {
     } catch {
       print("⚠️ StoragePathMigrator: migration failed with error: \(error)")
     }
+  }
+
+  private static func isBootstrapDestination(_ destination: URL, fileManager: FileManager) -> Bool {
+    guard fileManager.fileExists(atPath: destination.path) else { return true }
+    let databaseURL = destination.appendingPathComponent("chunks.sqlite")
+    guard fileManager.fileExists(atPath: databaseURL.path) else { return true }
+    let size = (try? databaseURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+    return size <= 4_096
   }
 
   private static func relocateDirectoryContents(

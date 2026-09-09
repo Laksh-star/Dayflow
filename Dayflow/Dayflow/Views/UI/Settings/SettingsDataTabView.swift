@@ -117,11 +117,11 @@ struct SettingsDataTabView: View {
   private var togglDraftSection: some View {
     SettingsSection(
       title: "Toggl draft export",
-      subtitle: "Map Dayflow projects to Toggl projects before exporting reviewed time entries."
+      subtitle: "Map Dayward projects to Toggl projects before exporting reviewed time entries."
     ) {
       VStack(alignment: .leading, spacing: 14) {
         Text(
-          "Mappings use: Dayflow project -> Toggl project | keyword,domain,app. Use SKIP as the Toggl project to exclude matching work. CSV export uses Toggl's import headers."
+          "Mappings use: Dayward project -> Toggl project | keyword,domain,app. Use SKIP as the Toggl project to exclude matching work. CSV export uses Toggl's import headers."
         )
         .font(.custom("Figtree", size: 12))
         .foregroundColor(SettingsStyle.secondary)

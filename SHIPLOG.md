@@ -1,8 +1,14 @@
-# Dayflow Dev Ship Log
+# Dayward Ship Log
 
 This file tracks local fork work that may or may not be suitable for upstream Dayflow.
 
 ## 2026-09-09
+
+- Rebranded the local fork and installed app to provisional name **Dayward**:
+  - app bundle: `/Applications/Dayward.app`;
+  - bundle ID: `com.lakshstar.dayward.dev` and URL scheme: `dayward-dev`;
+  - application data moved to `~/Library/Application Support/Dayward/` with a one-time copy from `DayflowDev` so the prior local app remains a rollback path;
+  - upstream Dayflow attribution and the MIT `LICENSE` remain intact.
 
 - Simplified the default daily workflow around optional direction, automatic capture, deliberate offline activity, and a staged Close the Day flow; planned blocks, distraction budgets, and detailed Focus Drift insights are now progressive-disclosure controls.
 

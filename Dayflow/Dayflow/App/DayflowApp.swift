@@ -8,7 +8,7 @@ import SwiftUI
 
 enum DayflowBuildIdentity {
   static var isDevBuild: Bool {
-    Bundle.main.bundleIdentifier == "teleportlabs.com.Dayflow.dev"
+    Bundle.main.bundleIdentifier == "com.lakshstar.dayward.dev"
   }
 }
 
@@ -142,7 +142,7 @@ struct DayflowApp: App {
   private let updaterManager = UpdaterManager.shared
 
   var body: some Scene {
-    Window("Dayflow", id: "main") {
+    Window("Dayward", id: "main") {
       ZStack {
         // Main app UI or onboarding with entrance animation
         Group {

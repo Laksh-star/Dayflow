@@ -41,9 +41,9 @@ final class UpdaterManager: NSObject, ObservableObject {
   private override init() {
     super.init()
 
-    if Bundle.main.bundleIdentifier == "teleportlabs.com.Dayflow.dev" {
-      statusText = "Updates disabled for Dayflow Dev"
-      print("[Sparkle] disabled for Dayflow Dev")
+    if Bundle.main.bundleIdentifier == "com.lakshstar.dayward.dev" {
+      statusText = "Updates disabled for Dayward"
+      print("[Sparkle] disabled for Dayward")
       return
     }
 

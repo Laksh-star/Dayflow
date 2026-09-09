@@ -55,7 +55,7 @@ final class AgentsRecapStore: ObservableObject {
 
   static func recapDirectory() -> URL {
     URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent("Library/Application Support/DayflowDev/agents", isDirectory: true)
+      .appendingPathComponent("Library/Application Support/Dayward/agents", isDirectory: true)
   }
 
   static func recapFileURL(for day: String) -> URL {

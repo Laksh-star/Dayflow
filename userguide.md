@@ -1,4 +1,4 @@
-# Dayflow Dev User Guide
+# Dayward User Guide
 
 ## The Daily Routine
 
@@ -21,7 +21,7 @@ Dayflow captures desktop work automatically. Use the optional controls only for 
 
 The developer Voice review prototype under Settings -> Other remains available to diagnose transcription separately. It supports on-device and explicitly selected OpenAI high-accuracy transcription; the latter submits only the held recording after release and removes the temporary audio file after transcription. **OpenAI high accuracy affects speech-to-text only.** The `Speak answer` control deliberately uses macOS's local system voice, so it is fast, private, and has no additional API cost.
 
-This guide covers the fork-specific workflow in `Dayflow Dev`.
+This guide covers the provisional `Dayward` product identity. It is a local fork derived from upstream Dayflow under the MIT License.
 
 ## Weekly application interactions
 
@@ -213,9 +213,9 @@ Retry only after the provider issue is fixed.
 
 ## Dev App Notes
 
-- Installed app: `/Applications/Dayflow Dev.app`
-- Bundle ID: `teleportlabs.com.Dayflow.dev`
-- Data folder: `~/Library/Application Support/DayflowDev/`
+- Installed app: `/Applications/Dayward.app`
+- Bundle ID: `com.lakshstar.dayward.dev`
+- Data folder: `~/Library/Application Support/Dayward/`
 
 If you rebuild locally, reinstall with:
 
@@ -234,7 +234,7 @@ Threads are inferred from card titles, saved project mappings, app/domain contex
 
 Select a dot to inspect the source card. Shapes update when the underlying cards or planned blocks change. Dayflow also archives the seven most recently completed days automatically as JSON and SVG files:
 
-`~/Library/Application Support/DayflowDev/day-shapes/YYYY/MM/YYYY-MM-DD.json`
+`~/Library/Application Support/Dayward/day-shapes/YYYY/MM/YYYY-MM-DD.json`
 
 Each day saves two compact visual snapshots beside its JSON archive:
 

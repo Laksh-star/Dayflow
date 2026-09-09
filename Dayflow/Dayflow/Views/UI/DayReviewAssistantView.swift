@@ -108,7 +108,7 @@ struct DayReviewAssistantView: View {
   }
 
   private var captureSection: some View {
-    reviewSectionCard(title: "1. Add offline activity", subtitle: "Only record meaningful work Dayflow could not see.") {
+    reviewSectionCard(title: "1. Add offline activity", subtitle: "Only record meaningful work Dayward could not see.") {
       HStack {
         Button(isShowingCaptureForm ? "Hide form" : "Add offline activity") { isShowingCaptureForm.toggle() }
           .buttonStyle(.bordered)

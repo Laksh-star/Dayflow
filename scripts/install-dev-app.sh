@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/Dayflow/Dayflow.xcodeproj"
 DERIVED_DATA_PATH="$ROOT_DIR/DerivedDataDev"
-BUILT_APP="$DERIVED_DATA_PATH/Build/Products/Debug/Dayflow Dev.app"
-INSTALL_APP="/Applications/Dayflow Dev.app"
+BUILT_APP="$DERIVED_DATA_PATH/Build/Products/Debug/Dayward.app"
+INSTALL_APP="/Applications/Dayward.app"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister"
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
@@ -17,7 +17,7 @@ if [[ "${DAYFLOW_ALLOW_ADHOC_SIGNING:-0}" != "1" ]]; then
     cat >&2 <<'EOF'
 No valid code-signing identity was found.
 
-Dayflow Dev needs a stable signing identity for macOS Screen & System Audio
+Dayward needs a stable signing identity for macOS Screen & System Audio
 Recording permission to survive rebuilds. Create an Apple Development certificate
 in Xcode first, then rerun this script.
 
@@ -31,7 +31,7 @@ else
   SIGNING_IDENTITY="-"
 fi
 
-echo "Building Dayflow Dev..."
+echo "Building Dayward..."
 xcodebuild \
   -project "$PROJECT_PATH" \
   -scheme Dayflow \
@@ -53,7 +53,7 @@ echo "Installing to /Applications..."
 ditto "$BUILT_APP" "$INSTALL_APP"
 
 echo "Cleaning LaunchServices registrations for build-output copies..."
-find "$ROOT_DIR" -path '*/Build/Products/*/Dayflow Dev.app' -type d -prune -print0 |
+find "$ROOT_DIR" -path '*/Build/Products/*/Dayward.app' -type d -prune -print0 |
   while IFS= read -r -d '' app_path; do
     if [[ "$app_path" != "$INSTALL_APP" ]]; then
       "$LSREGISTER" -u "$app_path" 2>/dev/null || true

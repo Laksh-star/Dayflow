@@ -200,7 +200,7 @@ struct SettingsView: View {
   private var sidebarFooter: some View {
     let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
     return VStack(alignment: .leading, spacing: 8) {
-      Text("Dayflow v\(version)")
+      Text("Dayward v\(version)")
         .font(.custom("Figtree", size: 11))
         .foregroundColor(.black.opacity(0.4))
 

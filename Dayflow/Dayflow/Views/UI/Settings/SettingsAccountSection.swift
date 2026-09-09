@@ -53,12 +53,12 @@ struct SettingsAccountSection: View {
 
   private var devAccountSection: some View {
     SettingsSection(
-      title: "Dayflow Dev",
-      subtitle: "Local fork build for personal workflow experiments."
+      title: "Dayward",
+      subtitle: "Provisional local name for personal workflow experiments."
     ) {
       VStack(alignment: .leading, spacing: 14) {
-        SettingsRow(label: "Build", subtitle: "Signed and isolated from public Dayflow") {
-          SettingsStatusDot(state: .good, label: "Dev mode")
+        SettingsRow(label: "Build", subtitle: "Signed and isolated from the upstream app") {
+          SettingsStatusDot(state: .good, label: "Local build")
         }
 
         SettingsRow(label: "Bundle ID", subtitle: Bundle.main.bundleIdentifier ?? "Unknown") {
@@ -67,7 +67,7 @@ struct SettingsAccountSection: View {
 
         SettingsRow(
           label: "Storage",
-          subtitle: "~/Library/Application Support/DayflowDev/",
+          subtitle: "~/Library/Application Support/Dayward/",
           showsDivider: false
         ) {
           SettingsBadge(text: "ISOLATED")

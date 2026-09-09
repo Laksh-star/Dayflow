@@ -88,7 +88,7 @@ enum DayShapeService {
 
   static func archiveDirectoryURL() -> URL {
     let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    return appSupport.appendingPathComponent("DayflowDev/day-shapes", isDirectory: true)
+    return appSupport.appendingPathComponent("Dayward/day-shapes", isDirectory: true)
   }
 
   private static func buildArchive(

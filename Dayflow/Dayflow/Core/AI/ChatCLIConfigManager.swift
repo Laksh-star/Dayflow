@@ -13,7 +13,7 @@ struct ChatCLIConfigManager {
     let appSupport = FileManager.default.urls(
       for: .applicationSupportDirectory, in: .userDomainMask
     ).first!
-    workingDirectory = appSupport.appendingPathComponent("DayflowDev/chatcli", isDirectory: true)
+    workingDirectory = appSupport.appendingPathComponent("Dayward/chatcli", isDirectory: true)
   }
 
   func ensureWorkingDirectory() {
