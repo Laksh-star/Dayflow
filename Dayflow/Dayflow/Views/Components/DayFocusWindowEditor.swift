@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DayFocusWindowEditor: View {
   @Binding var windows: [DayFocusWindow]
+  @Binding var isExpanded: Bool
   let focusCategories: [DayGoalCategorySnapshot]
   var onChanged: () -> Void = {}
 
@@ -19,13 +20,10 @@ struct DayFocusWindowEditor: View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
         VStack(alignment: .leading, spacing: 3) {
-          Text("Focus windows")
+          Text("Planned blocks")
             .font(.custom("Figtree", size: 14).weight(.semibold))
             .foregroundColor(.black)
-          Text("Optional: add planned blocks for drift analysis. These do not replace your daily focus goal.")
-            .font(.custom("Figtree", size: 11))
-            .foregroundColor(Design.muted)
-          Text("These chips come from your Focus goal categories. Filled chips count as on-plan for this block; gray chips are ignored.")
+          Text(windows.isEmpty ? "Optional. Add a block only when you want Plan vs Drift." : "Optional blocks used for Plan vs Drift.")
             .font(.custom("Figtree", size: 11))
             .foregroundColor(Design.muted)
         }
@@ -33,9 +31,10 @@ struct DayFocusWindowEditor: View {
         Spacer()
 
         Button {
-          addWindow()
+          isExpanded = true
+          if windows.isEmpty { addWindow() }
         } label: {
-          Label("Add window", systemImage: "plus")
+          Label(windows.isEmpty ? "Add a planned block" : "Edit blocks", systemImage: windows.isEmpty ? "plus" : "slider.horizontal.3")
             .font(.custom("Figtree", size: 12).weight(.medium))
             .foregroundColor(.white)
             .padding(.horizontal, 10)
@@ -47,17 +46,20 @@ struct DayFocusWindowEditor: View {
         .pointingHandCursor()
       }
 
-      if windows.isEmpty {
+      if isExpanded && windows.isEmpty {
         RoundedRectangle(cornerRadius: 6)
           .fill(Design.chipBackground)
           .overlay(
-            Text("No focus windows yet. Add one or more blocks if you want Plan vs Drift, Recovery Loop, and Attention Gradient for specific times of day.")
+            Text("No planned blocks yet. Add one or more if you want Plan vs Drift, Recovery Loop, and Attention Gradient for specific times of day.")
               .font(.custom("Figtree", size: 12))
               .foregroundColor(Design.muted)
               .padding(.horizontal, 14)
           )
           .frame(height: 56)
-      } else {
+      } else if isExpanded {
+        Text("These chips come from your Focus categories. Filled chips count as on-plan for this block; gray chips are ignored.")
+          .font(.custom("Figtree", size: 11))
+          .foregroundColor(Design.muted)
         VStack(spacing: 8) {
           ForEach(Array(windows.enumerated()), id: \.element.id) { index, window in
             FocusWindowRow(
@@ -181,7 +183,7 @@ private struct FocusWindowRow: View {
           .font(.custom("Figtree", size: 11).weight(.medium))
           .foregroundColor(Color(hex: "5F5A56"))
 
-        Text("Choose one or more of your Focus goal categories for this block.")
+          Text("Choose one or more of your Focus categories for this block.")
           .font(.custom("Figtree", size: 11))
           .foregroundColor(Color(hex: "7A7A7A"))
       }

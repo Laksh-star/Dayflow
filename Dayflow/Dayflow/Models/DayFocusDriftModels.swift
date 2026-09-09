@@ -181,6 +181,6 @@ struct DayFocusDriftSnapshot: Equatable, Sendable {
     windows: [],
     recoveryEvents: [],
     attentionState: nil,
-    attentionMessage: "Add focus windows to compare planned work against drift."
+    attentionMessage: "Add planned blocks to compare planned work against drift."
   )
 }

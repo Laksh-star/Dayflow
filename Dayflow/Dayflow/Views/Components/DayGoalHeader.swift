@@ -106,7 +106,7 @@ struct DayGoalHeader: View {
   private var statusText: String {
     switch recordingControlMode {
     case .active:
-      return "Tracking progress from your focus and distraction categories."
+      return "Focus categories and progress for today."
     case .pausedTimed, .pausedIndefinite:
       return "Dayflow is paused. Resume to continue tracking your progress."
     case .stopped:
@@ -173,7 +173,7 @@ struct DayGoalHeader: View {
 
   @ViewBuilder
   private var activeContent: some View {
-    Text("Today’s targets")
+    Text("Today’s direction")
       .font(.custom("Instrument Serif", size: 24))
       .foregroundColor(Design.title)
       .lineLimit(1)

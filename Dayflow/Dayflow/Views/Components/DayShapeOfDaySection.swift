@@ -94,7 +94,7 @@ struct DayShapeOfDaySection: View {
         } else {
           Text(mode == .constellation
             ? "Threads are inferred from card titles, projects, apps, domains, and time continuity."
-            : "Focus windows are shown as quiet background ranges when you have planned them.")
+            : "Planned blocks are shown as quiet background ranges when you have planned them.")
             .font(.custom("Figtree-Regular", size: 12))
             .foregroundStyle(Design.subtitleColor)
         }

@@ -18,6 +18,7 @@ struct DayFocusSummarySection: View {
   var onEditCategories: () -> Void
   var onToggleCategory: (TimelineCategory) -> Void
   var onDoneEditing: () -> Void
+  @State private var showsInsights = false
 
   private enum Design {
     static let sectionSpacing: CGFloat = 12
@@ -47,8 +48,17 @@ struct DayFocusSummarySection: View {
         LongestFocusCard(focusBlocks: focusBlocks)
 
         if focusDriftSnapshot.windows.isEmpty == false {
-          PlanVsDriftCard(snapshot: focusDriftSnapshot)
-          AttentionGradientCard(snapshot: focusDriftSnapshot)
+          DisclosureGroup("Insights", isExpanded: $showsInsights) {
+            VStack(spacing: Design.cardsSpacing) {
+              PlanVsDriftCard(snapshot: focusDriftSnapshot)
+              if focusDriftSnapshot.attentionState != nil {
+                AttentionGradientCard(snapshot: focusDriftSnapshot)
+              }
+            }
+            .padding(.top, 8)
+          }
+          .font(.custom("Figtree", size: 13).weight(.semibold))
+          .foregroundColor(Design.subtitleColor)
         }
       }
       .opacity(isSelectionEmpty ? 0.45 : 1)
@@ -98,7 +108,7 @@ private struct PlanVsDriftCard: View {
         Text("Plan vs Drift")
           .font(.custom("InstrumentSerif-Regular", size: 16))
           .foregroundColor(Color(hex: "333333"))
-        Text("Measures only the time inside your focus windows.")
+        Text("Measures only the time inside your planned blocks.")
           .font(.custom("Figtree", size: 11))
           .foregroundColor(Color(hex: "707070"))
       }
@@ -216,7 +226,7 @@ private struct AttentionGradientCard: View {
         Text("Attention Gradient")
           .font(.custom("InstrumentSerif-Regular", size: 16))
           .foregroundColor(Color(hex: "333333"))
-        Text("Based on the last 30 minutes inside your current focus windows.")
+        Text("Based on the last 30 minutes inside your current planned blocks.")
           .font(.custom("Figtree", size: 11))
           .foregroundColor(Color(hex: "707070"))
       }

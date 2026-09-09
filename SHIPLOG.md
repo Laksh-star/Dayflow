@@ -2,6 +2,10 @@
 
 This file tracks local fork work that may or may not be suitable for upstream Dayflow.
 
+## 2026-09-09
+
+- Simplified the default daily workflow around optional direction, automatic capture, deliberate offline activity, and a staged Close the Day flow; planned blocks, distraction budgets, and detailed Focus Drift insights are now progressive-disclosure controls.
+
 ## 2026-09-06
 
 - Wired the existing application-interaction analysis into the active Weekly dashboard:

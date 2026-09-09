@@ -541,7 +541,7 @@ struct DaySummaryView: View {
         cardsToReviewCount: cardsToReviewCount,
         onReviewTap: onReviewTap
       )
-      Button("Review day") { isShowingDayReview = true }
+      Button("Close the day") { isShowingDayReview = true }
         .buttonStyle(.bordered)
         .font(.custom("Figtree", size: 13).weight(.semibold))
     }

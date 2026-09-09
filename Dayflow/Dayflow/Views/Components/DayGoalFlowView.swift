@@ -134,6 +134,8 @@ struct DayGoalFlowView: View {
 
   @State private var screen: DayGoalFlowInitialScreen
   @State private var draft: DayGoalPlan
+  @State private var showsMoreOptions = false
+  @State private var showsPlannedBlocks = false
 
   init(
     review: DayGoalReviewSnapshot,
@@ -158,6 +160,7 @@ struct DayGoalFlowView: View {
     self.onCategoryToggled = onCategoryToggled
     _screen = State(initialValue: initialScreen)
     _draft = State(initialValue: plan)
+    _showsPlannedBlocks = State(initialValue: false)
   }
 
   private enum Design {
@@ -213,7 +216,7 @@ struct DayGoalFlowView: View {
 
       GoalReviewCard(
         kind: .focus,
-        title: "Focus target: \(formatDuration(review.plan.focusTargetDuration))",
+        title: "Focus categories: \(formatDuration(review.plan.focusTargetDuration))",
         subtitle: "Time spent: \(formatDuration(review.focusDuration))",
         targetDuration: review.plan.focusTargetDuration,
         actualDuration: review.focusDuration,
@@ -224,7 +227,7 @@ struct DayGoalFlowView: View {
 
       GoalReviewCard(
         kind: .distraction,
-        title: "Distraction limit: \(formatDuration(review.plan.distractionLimitDuration))",
+        title: "Distraction budget: \(formatDuration(review.plan.distractionLimitDuration))",
         subtitle: "Time spent distracted: \(formatDuration(review.distractedDuration))",
         targetDuration: review.plan.distractionLimitDuration,
         actualDuration: review.distractedDuration,
@@ -233,7 +236,7 @@ struct DayGoalFlowView: View {
       .frame(width: 388, height: 123)
       .position(x: 600, y: 491.5)
 
-      primaryButton("Set today’s goals") {
+      primaryButton("Set today’s direction") {
         onSetupStarted()
         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
           screen = .setup
@@ -249,7 +252,7 @@ struct DayGoalFlowView: View {
     let queueOffset: CGFloat = morningTasks.isEmpty ? 0 : 58
 
     return ZStack(alignment: .topLeading) {
-      Text("Where do you want to spend your time today?")
+      Text("Set today’s direction")
         .font(.custom("Instrument Serif", size: 24))
         .foregroundColor(.black)
         .multilineTextAlignment(.center)
@@ -263,10 +266,10 @@ struct DayGoalFlowView: View {
       }
 
       VStack(alignment: .leading, spacing: 4) {
-        Text("1. Set day targets")
+        Text("Focus categories")
           .font(.custom("Figtree", size: 13).weight(.semibold))
           .foregroundColor(Design.text)
-        Text("Choose the categories that count toward Focus and Distraction, then set the total time targets for the day.")
+        Text("Choose what you want to make progress on. A time target is optional.")
           .font(.custom("Figtree", size: 11))
           .foregroundColor(Color(hex: "6C625B"))
       }
@@ -284,7 +287,7 @@ struct DayGoalFlowView: View {
 
       GoalSetupPanel(
         kind: .focus,
-        title: "Focus goal",
+        title: "Focus categories",
         durationMinutes: $draft.focusTargetMinutes,
         leadingStatTitle: "Yesterday’s focus",
         leadingStatMinutes: focusStats.yesterdayMinutes,
@@ -298,40 +301,38 @@ struct DayGoalFlowView: View {
       .frame(width: 396, height: 321)
       .position(x: 397.86, y: 411.5 + queueOffset)
 
-      GoalSetupPanel(
-        kind: .distraction,
-        title: "Distraction limit",
-        durationMinutes: $draft.distractionLimitMinutes,
-        leadingStatTitle: "Yesterday’s Distractions",
-        leadingStatMinutes: distractionStats.yesterdayMinutes,
-        trailingStatTitle: "Last week’s Distraction average",
-        trailingStatMinutes: distractionStats.lastWeekAverageMinutes,
-        statScaleMaxMinutes: distractionStats.scaleMaxMinutes,
-        selectedCategories: resolvedSnapshots(for: .distraction),
-        onRemoveCategory: { removeCategoryFromPanel($0, from: .distraction) },
-        onDropCategory: { moveCategoryFromDrop($0, to: .distraction) }
-      )
-      .frame(width: 400.28, height: 323)
-      .position(x: 804, y: 412.5 + queueOffset)
-
-      VStack(alignment: .leading, spacing: 4) {
-        Text("2. Add focus windows (optional)")
-          .font(.custom("Figtree", size: 13).weight(.semibold))
-          .foregroundColor(Design.text)
-        Text("Use windows only when you want Dayflow to compare planned work against drift during specific time blocks.")
-          .font(.custom("Figtree", size: 11))
-          .foregroundColor(Color(hex: "6C625B"))
+      if showsMoreOptions {
+        GoalSetupPanel(
+          kind: .distraction,
+          title: "Distraction budget",
+          durationMinutes: $draft.distractionLimitMinutes,
+          leadingStatTitle: "Yesterday’s distractions",
+          leadingStatMinutes: distractionStats.yesterdayMinutes,
+          trailingStatTitle: "Last week’s average",
+          trailingStatMinutes: distractionStats.lastWeekAverageMinutes,
+          statScaleMaxMinutes: distractionStats.scaleMaxMinutes,
+          selectedCategories: resolvedSnapshots(for: .distraction),
+          onRemoveCategory: { removeCategoryFromPanel($0, from: .distraction) },
+          onDropCategory: { moveCategoryFromDrop($0, to: .distraction) }
+        )
+        .frame(width: 400.28, height: 323)
+        .position(x: 804, y: 412.5 + queueOffset)
+      } else {
+        Button("More options") { showsMoreOptions = true }
+          .font(.custom("Figtree", size: 12).weight(.medium))
+          .buttonStyle(.bordered)
+          .help("Set a distraction budget")
+          .position(x: 804, y: 306 + queueOffset)
       }
-      .frame(width: 804, alignment: .leading)
-      .position(x: 602, y: 585 + queueOffset)
 
       DayFocusWindowEditor(
         windows: $draft.focusWindows,
+        isExpanded: $showsPlannedBlocks,
         focusCategories: resolvedSnapshots(for: .focus),
         onChanged: normalizeFocusWindows
       )
       .frame(width: 804)
-      .position(x: 602, y: 718 + queueOffset)
+      .position(x: 602, y: (showsPlannedBlocks ? 718 : 610) + queueOffset)
 
       HStack(spacing: 10) {
         secondaryButton("Skip today", action: onSkip)
@@ -348,7 +349,7 @@ struct DayGoalFlowView: View {
           onConfirm(plan)
         }
       }
-      .position(x: 607.45, y: 872 + queueOffset)
+      .position(x: 607.45, y: (showsPlannedBlocks ? 872 : 730) + queueOffset)
     }
   }
 
@@ -357,15 +358,17 @@ struct DayGoalFlowView: View {
   }
 
   private var morningTaskQueue: some View {
-    VStack(alignment: .leading, spacing: 3) {
+    let carriedTask = morningTasks.first { $0.status == .deferred }
+    let otherTaskCount = morningTasks.filter { $0.id != carriedTask?.id }.count
+    return VStack(alignment: .leading, spacing: 3) {
       Text("Today's task queue")
         .font(.custom("Figtree", size: 12).weight(.semibold))
         .foregroundColor(Design.text)
-      Text(morningTasks.prefix(3).map(\.title).joined(separator: "  •  "))
+      Text(taskQueueSummary(carriedTask: carriedTask, otherTaskCount: otherTaskCount))
         .font(.custom("Figtree", size: 11))
         .foregroundColor(Color(hex: "6C625B"))
         .lineLimit(1)
-      Text("Tasks stay separate from focus targets and recorded time.")
+      Text("Separate from focus categories, planned blocks, and tracked time.")
         .font(.custom("Figtree", size: 10))
         .foregroundColor(Color(hex: "6C625B"))
     }
@@ -373,6 +376,13 @@ struct DayGoalFlowView: View {
     .padding(.vertical, 6)
     .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.64)))
     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.black.opacity(0.08), lineWidth: 1))
+  }
+
+  private func taskQueueSummary(carriedTask: DayflowTask?, otherTaskCount: Int) -> String {
+    var parts: [String] = []
+    if let carriedTask { parts.append("Carried forward: \(carriedTask.title)") }
+    if otherTaskCount > 0 { parts.append("\(otherTaskCount) other planned") }
+    return parts.joined(separator: "  •  ")
   }
 
   private var selectableCategories: [TimelineCategory] {

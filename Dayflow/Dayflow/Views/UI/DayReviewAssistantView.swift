@@ -25,6 +25,7 @@ struct DayReviewAssistantView: View {
   @State private var answerSource = ""
   @State private var recommendedTask: DayflowTask?
   @State private var inboxStatus = ""
+  @State private var isAssistantExpanded = false
 
   var body: some View {
     VStack(spacing: 0) {
@@ -32,9 +33,8 @@ struct DayReviewAssistantView: View {
       Divider()
       ScrollView {
         VStack(alignment: .leading, spacing: 22) {
-          taskSection
           captureSection
-          reviewSection
+          taskSection
           conversationSection
         }
         .padding(24)
@@ -48,7 +48,7 @@ struct DayReviewAssistantView: View {
   private var header: some View {
     HStack(alignment: .top) {
       VStack(alignment: .leading, spacing: 4) {
-        Text("Review day")
+        Text("Close the day")
           .font(.custom("InstrumentSerif", size: 30))
           .foregroundColor(SettingsStyle.text)
         Text(day)
@@ -68,7 +68,7 @@ struct DayReviewAssistantView: View {
   }
 
   private var taskSection: some View {
-    reviewSectionCard(title: "Tasks", subtitle: "Small intentions for this day. Completion is always your decision.") {
+    reviewSectionCard(title: "2. Resolve tasks", subtitle: "Only open tasks need a decision. Completion is always yours to confirm.") {
       HStack(spacing: 8) {
         TextField("Add a task", text: $taskTitle)
           .textFieldStyle(.roundedBorder)
@@ -78,7 +78,7 @@ struct DayReviewAssistantView: View {
           .disabled(taskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           .help("Add task")
       }
-      ForEach(tasks) { task in
+      ForEach(openTasks) { task in
         HStack(spacing: 10) {
           Button(action: { toggleTask(task) }) {
             Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
@@ -100,22 +100,24 @@ struct DayReviewAssistantView: View {
             .help("Delete task")
         }
       }
-      if tasks.isEmpty {
-        emptyText("No tasks yet. Add only the work you want to keep visible.")
+      if openTasks.isEmpty {
+        emptyText("No open tasks for this day.")
       }
+      taskEvidenceSuggestions
     }
   }
 
   private var captureSection: some View {
-    reviewSectionCard(title: "Manual captures", subtitle: "Record activity Dayflow could not see, without inventing tracked time.") {
+    reviewSectionCard(title: "1. Add offline activity", subtitle: "Only record meaningful work Dayflow could not see.") {
       HStack {
-        Button(isShowingCaptureForm ? "Hide capture" : "Add capture") { isShowingCaptureForm.toggle() }
+        Button(isShowingCaptureForm ? "Hide form" : "Add offline activity") { isShowingCaptureForm.toggle() }
           .buttonStyle(.bordered)
         Spacer()
-        Button("Choose mobile inbox", action: chooseMobileInbox)
-          .buttonStyle(.bordered)
-        Button("Import mobile inbox", action: importMobileInbox)
-          .buttonStyle(.bordered)
+        Menu("Mobile inbox") {
+          Button("Choose folder", action: chooseMobileInbox)
+          Button("Import now", action: importMobileInbox)
+        }
+        .buttonStyle(.bordered)
       }
       if !inboxStatus.isEmpty { emptyText(inboxStatus) }
       if isShowingCaptureForm {
@@ -168,17 +170,19 @@ struct DayReviewAssistantView: View {
         }
       }
       if captures.isEmpty && !isShowingCaptureForm {
-        emptyText("No manual captures for this day.")
+        emptyText("Nothing to add unless meaningful work happened away from your desktop.")
       }
     }
   }
 
-  private var reviewSection: some View {
-    reviewSectionCard(title: "Review", subtitle: "Suggestions are evidence, not automatic decisions.") {
-      let suggestions = makeSuggestions()
-      if suggestions.isEmpty {
-        emptyText("No review suggestions yet.")
-      }
+  @ViewBuilder
+  private var taskEvidenceSuggestions: some View {
+    let suggestions = makeSuggestions()
+    if suggestions.isEmpty == false {
+      Divider().padding(.vertical, 2)
+      Text("Evidence to review")
+        .font(.custom("Figtree", size: 12).weight(.semibold))
+        .foregroundColor(SettingsStyle.secondary)
       ForEach(suggestions) { suggestion in
         switch suggestion.kind {
         case .likelyWork(let task, let minutes, let cardIDs):
@@ -208,7 +212,10 @@ struct DayReviewAssistantView: View {
   }
 
   private var conversationSection: some View {
-    reviewSectionCard(title: "Ask about this day", subtitle: "Review only this day's recorded evidence. OpenAI is used only when you ask and it is configured directly.") {
+    reviewSectionCard(title: "3. Day review assistant", subtitle: "Optional. Ask when you want help interpreting the day's evidence.") {
+      Button(isAssistantExpanded ? "Hide assistant" : "Review with assistant") { isAssistantExpanded.toggle() }
+        .buttonStyle(.bordered)
+      if isAssistantExpanded {
       VStack(alignment: .leading, spacing: 8) {
         Text("Guided review")
           .font(.custom("Figtree", size: 12).weight(.semibold))
@@ -261,6 +268,7 @@ struct DayReviewAssistantView: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.035)))
       }
+      }
     }
     .onChange(of: voiceService.transcript) { _, transcript in
       guard !transcript.isEmpty else { return }
@@ -276,6 +284,7 @@ struct DayReviewAssistantView: View {
       }
       content()
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .padding(16)
     .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.62)))
     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black.opacity(0.07), lineWidth: 1))
@@ -343,7 +352,7 @@ struct DayReviewAssistantView: View {
   }
 
   private func makeSuggestions() -> [DayReviewSuggestion] {
-    let openTasks = tasks.filter { $0.status != .done && $0.status != .dropped }
+    let openTasks = self.openTasks
     return openTasks.compactMap { task in
       let words = Set(task.title.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).filter { $0.count > 3 })
       let matches = cards.filter { card in
@@ -360,6 +369,10 @@ struct DayReviewAssistantView: View {
       if !matches.isEmpty { return DayReviewSuggestion(id: "work-\(task.id)", kind: .likelyWork(task: task, minutes: minutes, cardIDs: matchedIDs)) }
       return DayReviewSuggestion(id: "carry-\(task.id)", kind: .carryForward(task: task))
     }
+  }
+
+  private var openTasks: [DayflowTask] {
+    tasks.filter { $0.status != .done && $0.status != .dropped }
   }
 
   private func linkEvidence(task: DayflowTask, cardIDs: [Int64]) {

@@ -52,7 +52,7 @@ struct DayDistractionSummarySection: View {
       )
       .frame(maxWidth: .infinity)
 
-      if focusDriftSnapshot.windows.isEmpty == false {
+      if focusDriftSnapshot.recoveryCount > 0 || focusDriftSnapshot.unresolvedRecoveryCount > 0 {
         RecoveryLoopCard(
           snapshot: focusDriftSnapshot,
           annotationsByEventID: recoveryAnnotationsByEventID
@@ -102,7 +102,7 @@ private struct RecoveryLoopCard: View {
         Text("Recovery Loop")
           .font(.custom("InstrumentSerif-Regular", size: 16))
           .foregroundColor(Color(hex: "333333"))
-        Text("Tracks drift and return events only inside focus windows.")
+        Text("Tracks drift and return events only inside planned blocks.")
           .font(.custom("Figtree", size: 11))
           .foregroundColor(Color(hex: "707070"))
       }
