@@ -64,10 +64,19 @@ struct SplashView: View {
     ZStack {
       Color.clear
 
-      Image("DayflowLaunch")
-        .resizable()
-        .aspectRatio(contentMode: .fit)
-        .frame(width: 180, height: 180)
+      VStack(spacing: 10) {
+        Image(systemName: "sun.horizon.fill")
+          .font(.system(size: 42, weight: .medium))
+          .foregroundStyle(Color(hex: "FF7A45"))
+
+        Text("Dayward")
+          .font(.custom("Instrument Serif", size: 38))
+          .foregroundStyle(Color(hex: "2E2925"))
+
+        Text("Private daily reflection")
+          .font(.custom("Figtree", size: 11).weight(.medium))
+          .foregroundStyle(Color(hex: "786E67"))
+      }
         .opacity(logoOpacity)
     }
     .frame(width: 250, height: 250)

@@ -2,7 +2,7 @@
 
 ## The Daily Routine
 
-Dayflow captures desktop work automatically. Use the optional controls only for context it cannot observe or for analysis you actively want.
+Dayward captures desktop work automatically. Use the optional controls only for context it cannot observe or for analysis you actively want.
 
 1. **Morning:** choose **Set goals** only if you want to set a direction. Pick Focus categories; the time target is optional. Add a Planned block only when you want Plan vs Drift for a specific time.
 2. **During the day:** do nothing for desktop work. Add offline activity only for meaningful meetings, errands, or work away from the computer.
@@ -11,11 +11,11 @@ Dayflow captures desktop work automatically. Use the optional controls only for 
 ## Closing the Day
 
 - **Tasks** are small intentions for the selected day. Only open tasks are shown in the primary resolution list. Marking one done, deferring it, or deleting it is always manual.
-- **Tasks** do not record actual time. They answer what you intended to do; Dayflow must not invent duration or completion from a task title. A later version may offer an optional estimate, but that will remain planned time rather than time worked.
+- **Tasks** do not record actual time. They answer what you intended to do; Dayward must not invent duration or completion from a task title. A later version may offer an optional estimate, but that will remain planned time rather than time worked.
 - **Offline activity** records meetings, offline work, personal activity, or notes. Add a time range only when you know it; that range is an explicit record of what happened. An untimed capture remains a note rather than becoming invented tracked time.
-- A timed capture appears as a clearly marked dashed **Manual** interval on the Day timeline. Untimed captures do not appear on the timeline because Dayflow has no truthful position for them.
+- A timed capture appears as a clearly marked dashed **Manual** interval on the Day timeline. Untimed captures do not appear on the timeline because Dayward has no truthful position for them.
 - Select a task while saving a capture to create an explicit evidence link. **Review** suggestions also compare task wording with desktop cards; choose **Link evidence** to retain a likely connection. Neither action marks a task complete.
-- **Mobile inbox:** choose a shared folder, such as an iCloud Drive folder that an iPhone Shortcut can write to, then choose **Import mobile inbox**. Dayflow reads JSON files but never moves or deletes them. It records each imported file path so repeated imports do not create duplicates. A payload needs `body`; it may also contain `kind` (`offline_work`, `meeting`, `personal`, or `note`), ISO-8601 `start` and `end`, `day` (`YYYY-MM-DD`), `taskID`, `categoryID`, and `projectName`.
+- **Mobile inbox:** choose a shared folder, such as an iCloud Drive folder that an iPhone Shortcut can write to, then choose **Import mobile inbox**. Dayward reads JSON files but never moves or deletes them. It records each imported file path so repeated imports do not create duplicates. A payload needs `body`; it may also contain `kind` (`offline_work`, `meeting`, `personal`, or `note`), ISO-8601 `start` and `end`, `day` (`YYYY-MM-DD`), `taskID`, `categoryID`, and `projectName`.
 - **Day review assistant** submits only the selected day's tasks, captures, and desktop cards when you press **Ask**. The three guided review actions answer different questions: **What did I finish?** separates confirmed task completion from recorded work; **What remains?** lists open tasks; **What should I do next?** recommends one open task only when it has matching same-day evidence. With a direct OpenAI provider configured, it uses that provider for the answer; otherwise it falls back to the same local evidence rules. Hold the microphone button to transcribe a question, review the transcript in the field, then choose **Ask**. The answer can be spoken with the Mac's system voice.
 - When **What should I do next?** identifies an open task with matching evidence, choose **Carry ... to tomorrow** to move that task into the next day's queue. This is always an explicit decision; it does not infer completion or create tracked time. Morning setup shows open planned and carried tasks above your direction as a reminder only. They do not change focus categories, planned blocks, or time tracking.
 
@@ -31,7 +31,7 @@ The Weekly dashboard now includes **Interactions between most used applications*
 - Select a node to inspect its total recorded time, work/personal/distraction split, and its strongest visible application switches.
 - Node colour uses the dominant recorded context by minutes. An app is not marked as a distraction because of one short distraction interval.
 - Lines represent observed switches between those applications within a day. They are not a claim of causality or task completion, and graph position has no semantic meaning.
-- The pattern and distraction panels use the same recorded transitions. When a card has no application/site metadata, Dayflow excludes it from this section instead of guessing.
+- The pattern and distraction panels use the same recorded transitions. When a card has no application/site metadata, Dayward excludes it from this section instead of guessing.
 - Use the download control on hover to export the graph as a PNG.
 
 ## Advanced Planning
@@ -58,14 +58,14 @@ Each planned block has:
 - an end time
 - one or more focus categories
 
-Use them when you want Dayflow to compare planned deep-work blocks against what actually happened.
+Use them when you want Dayward to compare planned deep-work blocks against what actually happened.
 
 Examples:
 
 - `Writing block`, `9:00 AM - 11:00 AM`, categories: `Research & Strategy`
 - `Build block`, `2:00 PM - 4:00 PM`, categories: `Engineering / Product`
 
-If you skip planned blocks, Dayflow still tracks your day normally. You just will not get plan-vs-drift metrics for that day.
+If you skip planned blocks, Dayward still tracks your day normally. You just will not get plan-vs-drift metrics for that day.
 
 Important:
 
@@ -167,7 +167,7 @@ Use Settings -> Export -> `Export Toggl CSV` when you want a reviewable draft be
 The mapping format is:
 
 ```text
-Dayflow project -> Toggl project | keyword,domain,app
+Dayward project -> Toggl project | keyword,domain,app
 ```
 
 Examples:
@@ -232,7 +232,7 @@ On the `Daily` screen, below the workflow sections, `Shape of your day` turns pr
 
 Threads are inferred from card titles, saved project mappings, app/domain context, and timing. Existing categories are only a fallback, so this is not a category chart or a performance score.
 
-Select a dot to inspect the source card. Shapes update when the underlying cards or planned blocks change. Dayflow also archives the seven most recently completed days automatically as JSON and SVG files:
+Select a dot to inspect the source card. Shapes update when the underlying cards or planned blocks change. Dayward also archives the seven most recently completed days automatically as JSON and SVG files:
 
 `~/Library/Application Support/Dayward/day-shapes/YYYY/MM/YYYY-MM-DD.json`
 
