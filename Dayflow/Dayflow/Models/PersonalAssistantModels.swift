@@ -81,6 +81,11 @@ struct ManualCapture: Identifiable, Equatable, Sendable {
     guard let startTs, let endTs, endTs > startTs else { return nil }
     return Int((Double(endTs - startTs) / 60).rounded())
   }
+
+  var duration: TimeInterval? {
+    guard let startTs, let endTs, endTs > startTs else { return nil }
+    return TimeInterval(endTs - startTs)
+  }
 }
 
 enum DayReviewDecisionKind: String, Codable, Sendable {

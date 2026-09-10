@@ -22,6 +22,7 @@ struct TogglDraftRow: Identifiable, Equatable {
   let dayflowProject: String
   var togglProject: String
   let sourceCardCount: Int
+  let isManual: Bool
   let skippedReason: String?
   var isIncluded: Bool
 
@@ -32,7 +33,13 @@ struct TogglDraftRow: Identifiable, Equatable {
       "\(Int(end.timeIntervalSince1970))",
       dayflowProject,
       "\(sourceCardCount)",
+      "\(isManual)",
     ].joined(separator: "|")
+  }
+
+  var sourceCountLabel: String {
+    let noun = isManual ? "manual capture" : "card"
+    return "\(sourceCardCount) \(sourceCardCount == 1 ? noun : "\(noun)s")"
   }
 }
 
@@ -252,20 +259,26 @@ enum TogglDraftExportService {
 
   static func buildRows(
     from cards: [TimelineCard],
+    manualCaptures: [ManualCapture] = [],
     mappings: [TogglProjectMapping],
     rounding: TogglRounding,
     mode: TogglExportMode,
     includePersonal: Bool,
     includeDistractions: Bool
   ) -> [TogglDraftRow] {
-    let items = cards.compactMap {
-      makeItem(
-        from: $0,
-        mappings: mappings,
-        includePersonal: includePersonal,
-        includeDistractions: includeDistractions
-      )
-    }
+    let items = (
+      cards.compactMap {
+        makeItem(
+          from: $0,
+          mappings: mappings,
+          includePersonal: includePersonal,
+          includeDistractions: includeDistractions
+        )
+      }
+      + manualCaptures.compactMap {
+        makeItem(from: $0, mappings: mappings, includePersonal: includePersonal)
+      }
+    )
     .sorted { $0.start < $1.start }
 
     let groups: [DraftGroup]
@@ -339,6 +352,7 @@ enum TogglDraftExportService {
         item.dayflowProject,
         item.togglProject,
         "\(item.isSkipped)",
+        "\(item.isManual)",
       ].joined(separator: "|")
 
       if var group = groupsByKey[key] {
@@ -380,6 +394,7 @@ enum TogglDraftExportService {
       dayflowProject: group.dayflowProject,
       togglProject: group.togglProject,
       sourceCardCount: group.items.count,
+      isManual: group.isManual,
       skippedReason: skippedReason,
       isIncluded: skippedReason == nil
     )
@@ -403,7 +418,7 @@ enum TogglDraftExportService {
     if !includePersonal && dayflowProject.caseInsensitiveCompare("Personal") == .orderedSame {
       return DraftItem(
         start: interval.start, end: interval.end, title: card.title,
-        dayflowProject: dayflowProject, togglProject: "Personal", isSkipped: true)
+        dayflowProject: dayflowProject, togglProject: "Personal", isSkipped: true, isManual: false)
     }
 
     if !includeDistractions
@@ -412,18 +427,65 @@ enum TogglDraftExportService {
     {
       return DraftItem(
         start: interval.start, end: interval.end, title: card.title,
-        dayflowProject: dayflowProject, togglProject: "Distractions", isSkipped: true)
+        dayflowProject: dayflowProject, togglProject: "Distractions", isSkipped: true, isManual: false)
     }
 
     switch destination {
     case .skip:
       return DraftItem(
         start: interval.start, end: interval.end, title: card.title,
-        dayflowProject: dayflowProject, togglProject: "SKIP", isSkipped: true)
+        dayflowProject: dayflowProject, togglProject: "SKIP", isSkipped: true, isManual: false)
     case .togglProject(let togglProject):
       return DraftItem(
         start: interval.start, end: interval.end, title: card.title,
-        dayflowProject: dayflowProject, togglProject: togglProject, isSkipped: false)
+        dayflowProject: dayflowProject, togglProject: togglProject, isSkipped: false, isManual: false)
+    }
+  }
+
+  private static func makeItem(
+    from capture: ManualCapture,
+    mappings: [TogglProjectMapping],
+    includePersonal: Bool
+  ) -> DraftItem? {
+    guard let startTs = capture.startTs, let endTs = capture.endTs, endTs > startTs else { return nil }
+
+    let dayflowProject = manualProject(for: capture)
+    let mapping = bestMapping(
+      for: "\(dayflowProject) \(capture.kind.label) \(capture.body)",
+      category: dayflowProject,
+      mappings: mappings
+    )
+    let destination = mapping?.destination ?? .togglProject(dayflowProject)
+    let start = Date(timeIntervalSince1970: TimeInterval(startTs))
+    let end = Date(timeIntervalSince1970: TimeInterval(endTs))
+
+    if !includePersonal && dayflowProject.caseInsensitiveCompare("Personal") == .orderedSame {
+      return DraftItem(
+        start: start, end: end, title: capture.body,
+        dayflowProject: dayflowProject, togglProject: "Personal", isSkipped: true, isManual: true)
+    }
+
+    switch destination {
+    case .skip:
+      return DraftItem(
+        start: start, end: end, title: capture.body,
+        dayflowProject: dayflowProject, togglProject: "SKIP", isSkipped: true, isManual: true)
+    case .togglProject(let togglProject):
+      return DraftItem(
+        start: start, end: end, title: capture.body,
+        dayflowProject: dayflowProject, togglProject: togglProject, isSkipped: false, isManual: true)
+    }
+  }
+
+  private static func manualProject(for capture: ManualCapture) -> String {
+    if let projectName = capture.projectName?.trimmingCharacters(in: .whitespacesAndNewlines), !projectName.isEmpty {
+      return projectName
+    }
+    switch capture.kind {
+    case .meeting: return "Meetings"
+    case .personal: return "Personal"
+    case .offlineWork: return "Offline work"
+    case .note: return "Notes"
     }
   }
 
@@ -526,6 +588,9 @@ enum TogglDraftExportService {
   private static func makeDescription(for group: DraftGroup, mode: TogglExportMode) -> String {
     let titles = group.items.map(\.title)
     let first = titles.first ?? "Work block"
+    if group.isManual {
+      return mode == .summary ? "\(group.dayflowProject): Manual activity summary" : "Manual: \(first)"
+    }
     if mode == .summary {
       return "\(group.dayflowProject): Daily work summary"
     }
@@ -576,7 +641,8 @@ enum TogglDraftExportService {
 
   private static func togglTags(for row: TogglDraftRow) -> String {
     [
-      "dayflow",
+      "dayward",
+      row.isManual ? "manual" : "",
       normalizedProjectTag(row.dayflowProject),
     ]
     .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -603,6 +669,7 @@ enum TogglDraftExportService {
     let dayflowProject: String
     let togglProject: String
     let isSkipped: Bool
+    let isManual: Bool
   }
 
   private struct DraftGroup {
@@ -612,6 +679,7 @@ enum TogglDraftExportService {
     let dayflowProject: String
     let togglProject: String
     var isSkipped: Bool
+    let isManual: Bool
     var totalDuration: TimeInterval
 
     init(item: DraftItem) {
@@ -621,6 +689,7 @@ enum TogglDraftExportService {
       dayflowProject = item.dayflowProject
       togglProject = item.togglProject
       isSkipped = item.isSkipped
+      isManual = item.isManual
       totalDuration = max(60, item.end.timeIntervalSince(item.start))
     }
 
@@ -628,6 +697,7 @@ enum TogglDraftExportService {
       dayflowProject == item.dayflowProject
         && togglProject == item.togglProject
         && isSkipped == item.isSkipped
+        && isManual == item.isManual
         && item.start.timeIntervalSince(end) <= mergeGapSeconds
     }
 

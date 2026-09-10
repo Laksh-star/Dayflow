@@ -4,6 +4,11 @@ This file tracks local fork work that may or may not be suitable for upstream Da
 
 ## 2026-09-09
 
+- Added a truthful manual-time path:
+  - timed offline activity now appears separately from observed desktop time as **Manual / offline time**, with **Total accounted time** showing the combined total;
+  - focus and distraction analytics remain desktop-observed only;
+  - Toggl drafts now include timed manual activity as separate `manual`-tagged entries, using the existing project mappings; tasks and untimed notes remain excluded.
+
 - Rebranded the local fork and installed app to provisional name **Dayward**:
   - app bundle: `/Applications/Dayward.app`;
   - bundle ID: `com.lakshstar.dayward.dev` and URL scheme: `dayward-dev`;

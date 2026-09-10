@@ -9,6 +9,8 @@ import SwiftUI
 
 struct DayDistractionSummarySection: View {
   let totalCapturedText: String
+  let totalManualText: String?
+  let totalAccountedText: String?
   let totalDistractedText: String
   let distractedRatio: Double
   let patternTitle: String
@@ -45,6 +47,8 @@ struct DayDistractionSummarySection: View {
 
       DistractionSummaryCard(
         totalCaptured: totalCapturedText,
+        totalManual: totalManualText,
+        totalAccounted: totalAccountedText,
         totalDistracted: totalDistractedText,
         distractedRatio: distractedRatio,
         patternTitle: patternTitle,

@@ -117,11 +117,11 @@ struct SettingsDataTabView: View {
   private var togglDraftSection: some View {
     SettingsSection(
       title: "Toggl draft export",
-      subtitle: "Map Dayward projects to Toggl projects before exporting reviewed time entries."
+      subtitle: "Map Dayward projects and timed offline activity to Toggl projects before exporting reviewed time entries."
     ) {
       VStack(alignment: .leading, spacing: 14) {
         Text(
-          "Mappings use: Dayward project -> Toggl project | keyword,domain,app. Use SKIP as the Toggl project to exclude matching work. CSV export uses Toggl's import headers."
+          "Mappings use: Dayward project -> Toggl project | keyword,domain,app. Timed offline activity appears as Meeting, Personal, Offline work, or Notes and exports with a manual tag. Use SKIP to exclude matching work."
         )
         .font(.custom("Figtree", size: 12))
         .foregroundColor(SettingsStyle.secondary)
@@ -345,7 +345,7 @@ struct SettingsDataTabView: View {
         Text(
           value.isSkipped
             ? (value.skippedReason ?? "Excluded")
-            : "\(value.sourceCardCount) \(value.sourceCardCount == 1 ? "card" : "cards")"
+            : value.sourceCountLabel
         )
           .font(.custom("Figtree", size: 11))
           .foregroundColor(

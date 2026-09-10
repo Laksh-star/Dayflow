@@ -58,6 +58,7 @@ struct DaySummaryView: View {
   @State private var cachedCategoryDurations: [CategoryTimeData] = []
   @State private var cachedTotalFocusTime: TimeInterval = 0
   @State private var cachedTotalCapturedTime: TimeInterval = 0
+  @State private var cachedManualCaptureTime: TimeInterval = 0
   @State private var cachedFocusBlocks: [FocusBlock] = []
   @State private var cachedTotalDistractedTime: TimeInterval = 0
   @State private var focusDriftSnapshot = DayFocusDriftSnapshot.empty
@@ -125,6 +126,14 @@ struct DaySummaryView: View {
 
   private var totalCapturedTime: TimeInterval {
     cachedTotalCapturedTime
+  }
+
+  private var totalManualCaptureTime: TimeInterval {
+    cachedManualCaptureTime
+  }
+
+  private var totalAccountedTime: TimeInterval {
+    totalCapturedTime + totalManualCaptureTime
   }
 
   private var focusBlocks: [FocusBlock] {
@@ -214,6 +223,9 @@ struct DaySummaryView: View {
       }
       loadData()
     }
+    .onReceive(NotificationCenter.default.publisher(for: .personalAssistantTimelineDidChange)) { _ in
+      loadData()
+    }
     .onChange(of: categories) {
       recomputeCachedStatsForCategoryChange()
     }
@@ -262,6 +274,7 @@ struct DaySummaryView: View {
     dataLoadTask = Task.detached(priority: .userInitiated) {
       // Use timeline display date to handle 4 AM boundary
       let cards = storageManager.fetchTimelineCards(forDay: dayString)
+      let manualCaptures = storageManager.fetchManualCaptures(forDay: dayString)
       let explicitPlanForDay = storageManager.fetchDayGoalPlan(forDay: dayString) != nil
       let plan = DaySummaryStats.carriedForwardGoalPlan(
         day: dayString,
@@ -285,6 +298,7 @@ struct DaySummaryView: View {
         from: precomputed, categories: currentCategories)
       let totalCaptured = DaySummaryStats.computeTotalCapturedTime(
         from: precomputed, categories: currentCategories)
+      let totalManual = DaySummaryStats.computeManualCaptureTime(from: manualCaptures)
       let totalFocus = DaySummaryStats.computeTotalFocusTime(
         from: precomputed, snapshots: plan.focusCategories, categories: currentCategories)
       let blocks = DaySummaryStats.computeFocusBlocks(
@@ -330,6 +344,7 @@ struct DaySummaryView: View {
         self.cardsWithDurations = precomputed
         self.cachedCategoryDurations = catDurations
         self.cachedTotalCapturedTime = totalCaptured
+        self.cachedManualCaptureTime = totalManual
         self.cachedTotalFocusTime = totalFocus
         self.cachedFocusBlocks = blocks
         self.cachedTotalDistractedTime = totalDistracted
@@ -572,6 +587,8 @@ struct DaySummaryView: View {
   private var distractionsSection: some View {
     DayDistractionSummarySection(
       totalCapturedText: formatDurationLowercase(totalCapturedTime),
+      totalManualText: totalManualCaptureTime > 0 ? formatDurationLowercase(totalManualCaptureTime) : nil,
+      totalAccountedText: totalManualCaptureTime > 0 ? formatDurationLowercase(totalAccountedTime) : nil,
       totalDistractedText: formatDurationLowercase(totalDistractedTime),
       distractedRatio: distractedRatio,
       patternTitle: showDistractionPattern ? (distractionPattern?.title ?? "") : "",

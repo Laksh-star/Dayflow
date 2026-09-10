@@ -64,6 +64,12 @@ enum DaySummaryStats {
     }
   }
 
+  /// Manual captures are explicit records, so they are intentionally kept out of
+  /// automatic category, focus, and distraction calculations.
+  static func computeManualCaptureTime(from captures: [ManualCapture]) -> TimeInterval {
+    captures.reduce(0) { $0 + ($1.duration ?? 0) }
+  }
+
   private struct FocusWindowWork {
     let window: DayFocusWindow
     let label: String

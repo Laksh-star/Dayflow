@@ -9,6 +9,8 @@ import SwiftUI
 
 struct DistractionSummaryCard: View {
   let totalCaptured: String
+  let totalManual: String?
+  let totalAccounted: String?
   let totalDistracted: String
   let distractedRatio: Double
   let patternTitle: String
@@ -16,12 +18,16 @@ struct DistractionSummaryCard: View {
 
   init(
     totalCaptured: String,
+    totalManual: String? = nil,
+    totalAccounted: String? = nil,
     totalDistracted: String,
     distractedRatio: Double,
     patternTitle: String = "Main distraction pattern",
     patternDescription: String
   ) {
     self.totalCaptured = totalCaptured
+    self.totalManual = totalManual
+    self.totalAccounted = totalAccounted
     self.totalDistracted = totalDistracted
     self.distractedRatio = distractedRatio
     self.patternTitle = patternTitle
@@ -113,6 +119,22 @@ struct DistractionSummaryCard: View {
         value: totalCaptured,
         color: Design.capturedTextColor
       )
+
+      if let totalManual {
+        statText(
+          title: "Manual / offline time",
+          value: totalManual,
+          color: Design.capturedTextColor
+        )
+      }
+
+      if let totalAccounted {
+        statText(
+          title: "Total accounted time",
+          value: totalAccounted,
+          color: Design.bodyTextColor
+        )
+      }
 
       statText(
         title: "Total time distracted",

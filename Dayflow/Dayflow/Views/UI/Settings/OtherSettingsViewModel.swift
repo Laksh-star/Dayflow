@@ -231,11 +231,13 @@ final class OtherSettingsViewModel: ObservableObject {
     let mappings = TogglMappingParser.parse(togglMappingText)
     let knownProjects = TogglProjectCatalog.parse(togglKnownProjectsText)
     let cards = timelineCards(from: start, through: end)
+    let manualCaptures = manualCaptures(from: start, through: end)
     let previousRows = togglDraftRows.reduce(into: [String: TogglDraftRow]()) { rows, row in
       rows[row.reviewKey] = row
     }
     togglDraftRows = TogglDraftExportService.buildRows(
       from: cards,
+      manualCaptures: manualCaptures,
       mappings: mappings,
       rounding: togglRounding,
       mode: togglExportMode,
@@ -357,6 +359,21 @@ final class OtherSettingsViewModel: ObservableObject {
       cursor = next
     }
     return cards
+  }
+
+  private func manualCaptures(from start: Date, through end: Date) -> [ManualCapture] {
+    let calendar = Calendar.current
+    let dayFormatter = DateFormatter()
+    dayFormatter.dateFormat = "yyyy-MM-dd"
+
+    var cursor = start
+    var captures: [ManualCapture] = []
+    while cursor <= end {
+      captures.append(contentsOf: StorageManager.shared.fetchManualCaptures(forDay: dayFormatter.string(from: cursor)))
+      guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
+      cursor = next
+    }
+    return captures
   }
 
   private func presentTogglSavePanelAndWrite(_ csv: String) {
