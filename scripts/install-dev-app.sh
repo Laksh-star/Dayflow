@@ -53,7 +53,9 @@ echo "Installing to /Applications..."
 ditto "$BUILT_APP" "$INSTALL_APP"
 
 echo "Cleaning LaunchServices registrations for build-output copies..."
-find "$ROOT_DIR" -path '*/Build/Products/*/Dayward.app' -type d -prune -print0 |
+find "$ROOT_DIR" -path '*/Build/Products/*' -type d \
+  \( -name 'Dayward.app' -o -name 'Dayflow.app' -o -name 'Dayflow Dev.app' -o -name 'DayflowUITests-Runner.app' \) \
+  -prune -print0 |
   while IFS= read -r -d '' app_path; do
     if [[ "$app_path" != "$INSTALL_APP" ]]; then
       "$LSREGISTER" -u "$app_path" 2>/dev/null || true
